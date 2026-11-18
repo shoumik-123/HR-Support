@@ -1,0 +1,9 @@
+node_modules
+dist
+.next
+.env
+.env.local
+.dev-db
+storage
+*.log
+apps/api/src/generated

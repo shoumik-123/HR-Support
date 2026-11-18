@@ -1,0 +1,24 @@
+# Production-like local stack. For a zero-Docker dev loop use `pnpm db:start` instead.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: veyra
+      POSTGRES_PASSWORD: veyra
+      POSTGRES_DB: veyra
+    ports: ["5433:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veyra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional: malware scanning for uploads. Set CLAMAV_HOST=clamav in the API env.
+  clamav:
+    image: clamav/clamav:stable
+    ports: ["3310:3310"]
+    profiles: ["security"]
+
+volumes:
+  pgdata:

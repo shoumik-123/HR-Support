@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: oklch(0.97 0.02 277);
+  --color-brand-100: oklch(0.94 0.04 277);
+  --color-brand-200: oklch(0.88 0.07 277);
+  --color-brand-300: oklch(0.8 0.11 277);
+  --color-brand-400: oklch(0.7 0.16 277);
+  --color-brand-500: oklch(0.62 0.2 277);
+  --color-brand-600: oklch(0.55 0.22 277);
+  --color-brand-700: oklch(0.48 0.2 277);
+  --color-brand-800: oklch(0.4 0.16 277);
+  --color-brand-900: oklch(0.33 0.12 277);
+}
+
+:root {
+  --surface: oklch(0.985 0.002 265);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunken: oklch(0.96 0.004 265);
+  --border: oklch(0.9 0.006 265);
+  --text: oklch(0.22 0.01 265);
+  --text-muted: oklch(0.52 0.012 265);
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 265 / 0.06), 0 1px 3px oklch(0.2 0.02 265 / 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: oklch(0.19 0.012 265);
+    --surface-raised: oklch(0.23 0.014 265);
+    --surface-sunken: oklch(0.16 0.012 265);
+    --border: oklch(0.32 0.016 265);
+    --text: oklch(0.96 0.004 265);
+    --text-muted: oklch(0.72 0.012 265);
+    --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: oklch(0.19 0.012 265);
+  --surface-raised: oklch(0.23 0.014 265);
+  --surface-sunken: oklch(0.16 0.012 265);
+  --border: oklch(0.32 0.016 265);
+  --text: oklch(0.96 0.004 265);
+  --text-muted: oklch(0.72 0.012 265);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3);
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+}
+
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-card);
+  }
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply border hover:bg-[var(--surface-sunken)];
+    border-color: var(--border);
+  }
+  .btn-ghost {
+    @apply hover:bg-[var(--surface-sunken)];
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+  .input {
+    @apply w-full rounded-lg border px-3 py-2 text-sm outline-none transition;
+    background: var(--surface-raised);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .input:focus {
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 3px var(--color-brand-100);
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium;
+  }
+  .hint {
+    @apply text-xs;
+    color: var(--text-muted);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+  }
+}
+
+/* Chart palette - single sequential hue, validated against both surfaces
+   (light #2a78d6 on #fcfcfb, dark #3987e5 on #1a1a19; both clear 3:1). */
+:root {
+  --chart-series-1: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chart-series-1: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  --chart-series-1: #3987e5;
+}

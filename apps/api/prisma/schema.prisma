@@ -1,0 +1,529 @@
+// Veyra Talent - Phase 1 data model.
+// Every tenant-owned table carries organizationId and is always queried with it.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── Identity & tenancy ─────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  HR_MANAGER
+  RECRUITER
+  HIRING_MANAGER
+  INTERVIEWER
+  EVALUATOR
+  VIEWER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  emailVerifiedAt DateTime?
+  isPlatformAdmin Boolean   @default(false)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships Membership[]
+  sessions    Session[]
+  tokens      UserToken[]
+}
+
+model Organization {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  logoUrl          String?
+  brandColor       String?
+  website          String?
+  industry         String?
+  companySize      String?
+  country          String?
+  timezone         String   @default("Asia/Dhaka")
+  defaultCurrency  String   @default("BDT")
+  // Blind mode hides names/contact/photos from reviewers and from AI matching prompts.
+  blindModeDefault Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  memberships  Membership[]
+  invitations  Invitation[]
+  departments  Department[]
+  jobs         Job[]
+  stages       PipelineStage[]
+  candidates   Candidate[]
+  resumes      Resume[]
+  applications Application[]
+  matches      MatchResult[]
+  notes        Note[]
+  activities   Activity[]
+  batches      UploadBatch[]
+  aiUsage      AiUsage[]
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           Role
+  tokenHash      String    @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserToken {
+  id        String    @id @default(cuid())
+  userId    String
+  type      TokenType
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+// ───────────────────────── Jobs ─────────────────────────
+
+enum JobStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum WorkMode {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  TEMPORARY
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobs         Job[]
+
+  @@unique([organizationId, name])
+}
+
+model Job {
+  id                   String         @id @default(cuid())
+  organizationId       String
+  title                String
+  departmentId         String?
+  description          String
+  responsibilities     String?
+  location             String?
+  workMode             WorkMode       @default(ONSITE)
+  employmentType       EmploymentType @default(FULL_TIME)
+  status               JobStatus      @default(DRAFT)
+  requiredSkills       String[]
+  preferredSkills      String[]
+  minExperienceYears   Int?
+  maxExperienceYears   Int?
+  educationRequirement String?
+  salaryMin            Int?
+  salaryMax            Int?
+  salaryCurrency       String         @default("BDT")
+  salaryVisible        Boolean        @default(false)
+  openings             Int            @default(1)
+  // Weights used by candidate matching; see MatchingCriteria in matching.criteria.ts.
+  matchingCriteria     Json?
+  hiringManagerIds     String[]
+  expiresAt            DateTime?
+  publishedAt          DateTime?
+  closedAt             DateTime?
+  createdById          String
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  applications Application[]
+  matches      MatchResult[]
+  batches      UploadBatch[]
+
+  @@index([organizationId, status])
+}
+
+// ───────────────────────── Pipeline ─────────────────────────
+
+enum StageKind {
+  APPLIED
+  SCREENING
+  SHORTLISTED
+  ASSESSMENT
+  INTERVIEW
+  FINAL_REVIEW
+  OFFER
+  HIRED
+  REJECTED
+  CUSTOM
+}
+
+model PipelineStage {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  kind           StageKind @default(CUSTOM)
+  position       Int
+  color          String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([organizationId, position])
+}
+
+// ───────────────────────── Candidates & resumes ─────────────────────────
+
+enum CandidateSource {
+  UPLOAD
+  CAREER_PORTAL
+  REFERRAL
+  AGENCY
+  LINKEDIN
+  JOB_BOARD
+  OTHER
+}
+
+enum ConsentStatus {
+  UNKNOWN
+  GRANTED
+  WITHDRAWN
+}
+
+model Candidate {
+  id                   String          @id @default(cuid())
+  organizationId       String
+  fullName             String
+  email                String?
+  phone                String?
+  location             String?
+  headline             String?
+  summary              String?
+  linkedinUrl          String?
+  githubUrl            String?
+  portfolioUrl         String?
+  totalExperienceYears Float?
+  skills               String[]
+  languages            String[]
+  // Structured profile: education, experience, certifications, projects - each item
+  // carries `evidence` (verbatim resume snippet) and `confidence` (0-1).
+  profile              Json?
+  missingFields        String[]
+  source               CandidateSource @default(UPLOAD)
+  tags                 String[]
+  consentStatus        ConsentStatus   @default(UNKNOWN)
+  consentUpdatedAt     DateTime?
+  createdById          String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  resumes      Resume[]
+  applications Application[]
+  matches      MatchResult[]
+  notes        Note[]
+
+  @@index([organizationId, email])
+  @@index([organizationId, phone])
+  @@index([organizationId, createdAt])
+}
+
+enum ResumeStatus {
+  UPLOADED
+  PROCESSING
+  PARSED
+  FAILED
+}
+
+enum AnalysisMethod {
+  AI
+  HEURISTIC
+}
+
+model UploadBatch {
+  id             String   @id @default(cuid())
+  organizationId String
+  // When set, every parsed candidate is added to this job's pipeline.
+  jobId          String?
+  total          Int      @default(0)
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  resumes      Resume[]
+}
+
+model Resume {
+  id                String          @id @default(cuid())
+  organizationId    String
+  candidateId       String?
+  batchId           String?
+  fileName          String
+  mimeType          String
+  sizeBytes         Int
+  storageKey        String
+  sha256            String
+  version           Int             @default(1)
+  status            ResumeStatus    @default(UPLOADED)
+  rawText           String?
+  parsed            Json?
+  parseMethod       AnalysisMethod?
+  model             String?
+  promptVersion     String?
+  overallConfidence Float?
+  error             String?
+  uploadedById      String?
+  createdAt         DateTime        @default(now())
+  processedAt       DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  candidate    Candidate?   @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  batch        UploadBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, sha256])
+  @@index([candidateId])
+  @@index([batchId])
+}
+
+// ───────────────────────── Applications & matching ─────────────────────────
+
+enum ApplicationStatus {
+  ACTIVE
+  REJECTED
+  HIRED
+  WITHDRAWN
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  organizationId  String
+  jobId           String
+  candidateId     String
+  stageId         String
+  status          ApplicationStatus @default(ACTIVE)
+  rejectionReason String?
+  rejectedAt      DateTime?
+  hiredAt         DateTime?
+  isReapplication Boolean           @default(false)
+  source          CandidateSource   @default(UPLOAD)
+  stageEnteredAt  DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate    Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  stage        PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  matches      MatchResult[]
+  notes        Note[]
+
+  @@unique([jobId, candidateId])
+  @@index([organizationId, stageId])
+  @@index([organizationId, status])
+}
+
+enum ReviewStatus {
+  PENDING
+  ACCEPTED
+  ADJUSTED
+  DISMISSED
+}
+
+// Matching history: a new row per run. AI output is advisory; humans review it.
+model MatchResult {
+  id               String         @id @default(cuid())
+  organizationId   String
+  applicationId    String
+  jobId            String
+  candidateId      String
+  score            Int
+  breakdown        Json
+  matchedSkills    String[]
+  missingSkills    String[]
+  strengths        Json
+  gaps             Json
+  summary          String
+  confidence       Float
+  method           AnalysisMethod
+  model            String?
+  promptVersion    String
+  criteriaSnapshot Json
+  blindMode        Boolean        @default(true)
+  reviewStatus     ReviewStatus   @default(PENDING)
+  adjustedScore    Int?
+  reviewNote       String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  application  Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job          Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate    Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([organizationId, jobId])
+}
+
+// ───────────────────────── Collaboration & audit ─────────────────────────
+
+model Note {
+  id             String   @id @default(cuid())
+  organizationId String
+  candidateId    String
+  applicationId  String?
+  authorId       String
+  body           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  candidate    Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  application  Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([candidateId, createdAt])
+}
+
+// Activity timeline + audit log in one append-only table.
+model Activity {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String?
+  action         String
+  entityType     String
+  entityId       String
+  candidateId    String?
+  jobId          String?
+  applicationId  String?
+  data           Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([candidateId, createdAt])
+  @@index([jobId, createdAt])
+}
+
+// ───────────────────────── Platform ─────────────────────────
+
+enum BackgroundJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// Postgres-backed work queue (FOR UPDATE SKIP LOCKED). Swap for BullMQ/Redis at scale.
+model BackgroundJob {
+  id             String              @id @default(cuid())
+  organizationId String?
+  type           String
+  payload        Json
+  status         BackgroundJobStatus @default(PENDING)
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(3)
+  runAt          DateTime            @default(now())
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastError      String?
+  idempotencyKey String?             @unique
+  createdAt      DateTime            @default(now())
+  completedAt    DateTime?
+
+  @@index([status, runAt])
+}
+
+model AiUsage {
+  id             String   @id @default(cuid())
+  organizationId String
+  feature        String
+  model          String
+  inputTokens    Int
+  outputTokens   Int
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}

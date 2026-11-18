@@ -1,0 +1,15 @@
+{
+  "name": "veyra-talent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Veyra Talent - AI-powered applicant tracking & talent acquisition platform",
+  "scripts": {
+    "db:start": "node scripts/dev-db.mjs",
+    "dev:api": "pnpm --filter @veyra/api dev",
+    "dev:web": "pnpm --filter @veyra/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "packageManager": "pnpm@12.18.0"
+}
