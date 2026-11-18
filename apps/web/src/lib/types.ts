@@ -921,3 +921,58 @@ export interface SavedSearch {
   lastRunAt: string | null;
   updatedAt: string;
 }
+
+// ───────────────────────── Recruitment copilot ─────────────────────────
+
+export type CopilotIntent =
+  | "top_candidates"
+  | "pipeline_health"
+  | "stuck_applications"
+  | "time_to_hire"
+  | "interview_load"
+  | "offer_status"
+  | "assessment_status"
+  | "job_funnel"
+  | "find_candidates"
+  | "capabilities";
+
+export interface CopilotFact {
+  label: string;
+  value: string | number | null;
+  detail?: string;
+}
+
+export interface CopilotReference {
+  type: "job" | "candidate" | "application" | "interview" | "offer" | "assessment" | "stage";
+  id: string;
+  label: string;
+  detail?: string;
+  score?: number | null;
+}
+
+export interface CopilotAnswer {
+  question: string;
+  intent: CopilotIntent;
+  /** The question the copilot understood, in its own words. */
+  asked: string;
+  subject: string | null;
+  answer: string;
+  /** The figures the API computed; the prose may only describe these. */
+  facts: CopilotFact[];
+  references: CopilotReference[];
+  notes: string[];
+  followUps: string[];
+  method: "AI" | "HEURISTIC";
+  model: string | null;
+  promptVersion: string;
+  routing: { method: "AI" | "HEURISTIC"; confidence: number };
+  confidence: number;
+  blindMode: boolean;
+  canAsk: { intent: CopilotIntent; summary: string }[];
+}
+
+export interface CopilotQuestion {
+  intent: CopilotIntent;
+  summary: string;
+  examples: string[];
+}

@@ -32,7 +32,7 @@ apps/api/                NestJS 11 — সব বিজনেস লজিক �
   src/generated/prisma   Prisma client (generated, কমিট করা হয় না)
   src/common/            guard, permission, activity log, crypto, validation
   src/<module>/          ফিচার মডিউল (নিচে তালিকা)
-  test/                  node:test, ২২৪টা ইউনিট টেস্ট
+  test/                  node:test, ২৫৮টা ইউনিট টেস্ট
 apps/web/src/app/        Next.js App Router — এক ফোল্ডার = এক রুট
 scripts/dev-db.mjs       লোকাল Postgres
 ```
@@ -81,6 +81,7 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
 | `communications` | email template, automation | `template-render.ts` |
 | `careers` | পাবলিক job board ও apply (auth ছাড়া) | `public-view.ts` |
 | `talent` | প্রার্থী-ভাণ্ডারে ভাষাভিত্তিক সার্চ, জমানো সার্চ | `talent-query.ts` |
+| `copilot` | নিজের ডেটা নিয়ে প্রশ্নোত্তর, সংখ্যা API-র হিসাব | `copilot-intents.ts` |
 | `queue` | Postgres-ভিত্তিক job queue | `queue.service.ts` |
 | `ai` | Claude API wrapper | `ai.service.ts` |
 | `dashboard` | সংখ্যা, funnel | `dashboard.service.ts` |
@@ -99,6 +100,10 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
   ধরে required / preferred / excluded আলাদা হয়, API key না থাকলে এটাই একমাত্র পার্সার
 - [talent/talent-scoring.ts](apps/api/src/talent/talent-scoring.ts) — সার্চের র‍্যাঙ্কিং; ওজন নির্দিষ্ট,
   অনুপস্থিত মাপকাঠির ওজন পুনর্বণ্টিত, প্রতিটা দাবির সাথে CV-র লাইন
+- [copilot/copilot-intents.ts](apps/api/src/copilot/copilot-intents.ts) — কোপাইলট কোন প্রশ্নগুলোর উত্তর
+  দিতে পারে, কোন রোলে কোনটা, আর প্রশ্ন কোনটা সেটা নিয়মে বোঝা; তালিকার বাইরে সে কিছুই করতে পারে না
+- [copilot/copilot-findings.ts](apps/api/src/copilot/copilot-findings.ts) — উত্তরের উপাদান; মডেল শুধু এই
+  সংখ্যাগুলোই দেখে, তাই নতুন সংখ্যা বানানোর উপায় তার নেই
 
 ---
 
@@ -202,7 +207,7 @@ pnpm test:e2e                   # Phase 1 — ৫২ HTTP চেক
 pnpm test:e2e:phase2            # ৮৬
 pnpm test:e2e:phase3            # ৯৮
 pnpm test:e2e:phase4            # ৫১
-pnpm test:e2e:phase5            # ৫৯
+pnpm test:e2e:phase5            # ৯৩
 ```
 
 e2e-র জন্য তিনটা সার্ভার চালু থাকতে হবে। প্রতিটা suite শুরুতেই নিজের আগের ডেটা পরিষ্কার করে,

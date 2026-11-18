@@ -21,6 +21,8 @@ import { CommunicationsController } from "./communications/communications.contro
 import { CommunicationsService } from "./communications/communications.service";
 import { CandidatesService } from "./candidates/candidates.service";
 import { config } from "./config";
+import { CopilotController } from "./copilot/copilot.controller";
+import { CopilotService } from "./copilot/copilot.service";
 import { DashboardController } from "./dashboard/dashboard.controller";
 import { DashboardService } from "./dashboard/dashboard.service";
 import { HealthController } from "./health.controller";
@@ -81,6 +83,7 @@ import { TalentService } from "./talent/talent.service";
     PublicOfferController,
     PublicCareersController,
     TalentController,
+    CopilotController,
     DashboardController,
   ],
   providers: [
@@ -102,6 +105,7 @@ import { TalentService } from "./talent/talent.service";
     OffersService,
     CareersService,
     TalentService,
+    CopilotService,
     DashboardService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

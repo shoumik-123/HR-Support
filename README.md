@@ -5,8 +5,8 @@
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
 This repository covers **Phase 1** (core recruitment and AI screening), **Phase 2**
 (interview and communication automation), **Phase 3** (assessments, offers and
-onboarding), **Phase 4** (the public careers portal) and **Phase 5** (talent-pool search)
-of the product plan.
+onboarding), **Phase 4** (the public careers portal) and **Phase 5** (talent-pool search and
+the recruitment copilot) of the product plan.
 
 ```
 apps/api   NestJS + Prisma + PostgreSQL API, background worker, Claude integration
@@ -151,7 +151,22 @@ criteria it was approved with, and re-run later — saved searches are private t
 blind mode the resume is redacted before it is searched at all, so a name cannot be typed in to
 see which masked card comes back.
 
-Not yet built (later phases): the AI recruitment copilot, WhatsApp integration, and billing.
+**Recruitment copilot** (Phase 5) — a question box over your own hiring data: "where is the
+pipeline stuck?", "who has been waiting more than 14 days?", "what is our time to hire this
+quarter?", "which offers are waiting on approval?", "do we have anyone with Kubernetes?". It is
+not an agent over the database. It answers a fixed list of questions, each backed by one
+deterministic query, and a model does only two narrow jobs: reading which question was asked
+(it sees the question and the list of answerable questions, no data) and phrasing the reply
+from figures the API has already computed. Those figures are shown beside the prose, so the
+answer can be checked against them; without an API key the same figures are reported in plainer
+words. Each answer carries the question it understood, the rows behind it, its caveats,
+suggested follow-ups, whether a model was involved and how confident the routing was. A member
+is only ever routed to a question their role permits, so an answer cannot be the way someone
+learns what their permissions hide, and in blind mode candidates appear by reference rather than
+by name. Asked who to hire, reject or advance, it declines and says why — and gives no figures
+in place of the judgement it refused to make.
+
+Not yet built (later phases): WhatsApp integration and billing.
 
 **Coding assessments are deliberately not included.** The PRD requires candidate code to run in
 isolated infrastructure; running untrusted code without a sandbox would be irresponsible, so the
@@ -226,14 +241,14 @@ applications, match history and stored files.
 
 ```bash
 cd apps/api
-pnpm test                # 224 unit tests
+pnpm test                # 258 unit tests
 
 # End-to-end, against a running API with seeded demo data:
 pnpm db:seed && pnpm test:e2e          # Phase 1 — 52 checks
 pnpm db:seed && pnpm test:e2e:phase2   # Phase 2 — 86 checks
 pnpm db:seed && pnpm test:e2e:phase3   # Phase 3 — 98 checks
 pnpm db:seed && pnpm test:e2e:phase4   # Phase 4 — 51 checks
-pnpm db:seed && pnpm test:e2e:phase5   # Phase 5 — 59 checks
+pnpm db:seed && pnpm test:e2e:phase5   # Phase 5 — 93 checks
 ```
 
 Unit tests cover the matching algorithm and its weighting, the AI matcher's score aggregation and
@@ -248,7 +263,10 @@ hiring data from every public shape), and how a talent-pool search phrase is rea
 against bonuses against exclusions, experience floors and ranges including Bengali numerals, filler
 words that must not become search terms) together with the ranking arithmetic (weight
 redistribution, evidence quoting, protected lines never becoming evidence, and no criterion scoring
-zero merely because the data is missing).
+zero merely because the data is missing), and how a copilot question is routed (which of the
+fixed questions it is, the period and job title read out of it, a question it cannot answer
+being admitted rather than guessed at, a request to judge a person being recognised, and the
+rule-based answer repeating every caveat it was given).
 
 The end-to-end suites exercise the running API: authentication, RBAC, tenant isolation, matching and
 review, the pipeline, blind mode, uploads and validation; then templates and automation gating,
@@ -263,7 +281,10 @@ and the fact that an `X-Org-Id` header on a public route changes nothing; then t
 a phrase read into criteria, hand-corrected criteria searched as given, the same criteria producing
 the same order twice, exclusions removing people rather than demoting them, an empty search carrying
 no scores at all, saved searches staying private to their author, and a name finding nobody once
-blind mode is on.
+blind mode is on; and the copilot — its figures agreeing with the dashboard's and with the real
+application counts, a job it cannot find being said so rather than invented, a request to judge a
+person refused with no data in its place, an instruction hidden in a question ignored, and an
+interviewer being offered a shorter list of questions than a recruiter.
 
 Run each suite against a fresh seed — the Phase 1 suite rejects an application, which leaves fewer
 active candidates than the Phase 2 suite expects.

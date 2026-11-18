@@ -1,7 +1,7 @@
 # Veyra Talent — project notes for Claude
 
 Read this instead of re-exploring the repo. Phases 1–4 are complete; phase 5 is in progress
-(talent-pool search done; AI copilot, WhatsApp and billing still to build).
+(talent-pool search and the copilot are done; WhatsApp and billing still to build).
 
 ## Shape
 
@@ -50,6 +50,12 @@ password — there is no admin@, hiring@ or interviewer@ account).
   is whose.
 - **Saved searches are private to their author** (`@@unique([organizationId, createdById, name])`);
   re-running one searches the criteria that were saved, not whatever the parser would say today.
+- **The copilot answers a fixed list of questions, never free-form SQL.** `copilot-intents.ts` is
+  that list; each entry has one deterministic query and one permission, and a member is only routed
+  to questions their role allows. A model does two narrow things: route the question (it sees the
+  question and the list, no data) and phrase the reply from `Findings` — the figures the API already
+  computed. It may not produce a number. Asked to judge a person, the copilot answers with a
+  refusal **and no figures**, so declining cannot leak a hint.
 - **Coding assessments are deliberately absent.** The PRD requires isolated infrastructure; running
   untrusted code in the API process would be unsafe. Do not add them without a sandbox.
 - `apps/api/.env` and `storage/` stay gitignored (real JWT secret, candidate resumes). Repo is public.
@@ -78,13 +84,18 @@ password — there is no admin@, hiring@ or interviewer@ account).
   breaks in two and the stray "js" is read as a requirement for JavaScript.
 - Words left over from a negative clause follow that clause's modality. "no WordPress" has to become
   an exclusion; left as a plain keyword it turns into something the search looks *for*.
+- The analytics routes live under `/analytics`, not `/dashboard`, though the module is `dashboard/`.
+- `/auth/me` returns the user's fields at the top level (`id`, not `user.id`) plus `organizations[]`.
+- The seed's VIEWER role holds every *view* permission, so it is not a useful stand-in for a
+  low-privilege member. INTERVIEWER is (no analytics, offers or assessments).
 
 ## Tests
 
-`cd apps/api && pnpm test` (224 unit tests, node:test). E2E: `pnpm test:e2e`,
-`test:e2e:phase2`, `test:e2e:phase3`, `test:e2e:phase4`, `test:e2e:phase5` (346 HTTP checks total) —
+`cd apps/api && pnpm test` (258 unit tests, node:test). E2E: `pnpm test:e2e`,
+`test:e2e:phase2`, `test:e2e:phase3`, `test:e2e:phase4`, `test:e2e:phase5` (380 HTTP checks total) —
 need all three servers up, and a fresh `pnpm db:seed` before each suite. The phase 4 and phase 5
-suites need blind mode off and set it themselves; both leave it off.
+suites need blind mode off and set it themselves; both leave it off. The phase 5 suite also moves
+the viewer account to INTERVIEWER to prove the copilot's catalogue shrinks, and moves it back.
 
 ## Docs
 

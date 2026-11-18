@@ -11,6 +11,7 @@ const NAV = [
   { href: "/jobs", label: "Jobs", icon: "▤", permission: "job:view" },
   { href: "/candidates", label: "Candidates", icon: "◍", permission: "candidate:view" },
   { href: "/talent-search", label: "Smart search", icon: "✦", permission: "candidate:view" },
+  { href: "/copilot", label: "Copilot", icon: "◈", permission: "job:view" },
   { href: "/interviews", label: "Interviews", icon: "◷", permission: "interview:view" },
   { href: "/assessments", label: "Assessments", icon: "✎", permission: "assessment:view" },
   { href: "/offers", label: "Offers", icon: "◎", permission: "offer:view" },
