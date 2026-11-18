@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { shouldMask, view } from "../candidates/candidate-view";
 import { ActivityService } from "../common/activity.service";
+import { CommunicationsService } from "../communications/communications.service";
 import { RequestContext } from "../common/context";
 import { paginate } from "../common/validation";
 import { Prisma } from "../generated/prisma/client";
@@ -35,6 +36,7 @@ export class ApplicationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
+    private readonly comms: CommunicationsService,
   ) {}
 
   /** Kanban board: stages with their applications, capped per stage. */
@@ -127,6 +129,7 @@ export class ApplicationsService {
       data: { organizationId: ctx.orgId, jobId, candidateId, stageId: applied.id, source, isReapplication: priorApplications > 0 },
     });
     await this.log(ctx, "application.created", application, { via: "manual" });
+    await this.comms.fire("APPLICATION_CREATED", { orgId: ctx.orgId, applicationId: application.id, candidateId });
     return application;
   }
 
@@ -149,6 +152,10 @@ export class ApplicationsService {
       },
     });
     await this.log(ctx, "application.stage_changed", updated, { from: previous?.name, to: stage.name });
+    await this.comms.fire("STAGE_CHANGED", { orgId: ctx.orgId, applicationId: updated.id, candidateId: updated.candidateId, stageId });
+    if (stage.kind === "HIRED") {
+      await this.comms.fire("CANDIDATE_HIRED", { orgId: ctx.orgId, applicationId: updated.id, candidateId: updated.candidateId });
+    }
     return updated;
   }
 
@@ -161,6 +168,9 @@ export class ApplicationsService {
     });
     // Rejection is always an explicit human decision; AI never performs it.
     await this.log(ctx, "application.rejected", updated, { reason, fromStageId: app.stageId, decidedBy: ctx.name });
+    // The human decision above has already been recorded; this only notifies the candidate,
+    // and only if the organization has deliberately turned that automation on.
+    await this.comms.fire("APPLICATION_REJECTED", { orgId: ctx.orgId, applicationId: updated.id, candidateId: updated.candidateId });
     return updated;
   }
 

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { StatusChip } from "@/app/jobs/page";
 import { MatchDetail } from "@/components/match-detail";
+import { ScheduleInterviewModal } from "@/components/schedule-interview";
 import { Alert, EmptyState, Modal, PageHeader, ScoreBadge, Spinner, formatMoney, timeAgo } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -122,10 +124,12 @@ function JobWorkspace({ jobId }: { jobId: string }) {
 
 function PipelineBoard({ jobId }: { jobId: string }) {
   const { can } = useSession();
+  const router = useRouter();
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<ApplicationCard | null>(null);
+  const [scheduling, setScheduling] = useState<ApplicationCard | null>(null);
   const dragOver = useRef<string | null>(null);
 
   const load = useCallback(() => api<Board>(`/applications/board?jobId=${jobId}`).then(setBoard).catch((e) => setError(e.message)), [jobId]);
@@ -241,11 +245,18 @@ function PipelineBoard({ jobId }: { jobId: string }) {
                     <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
                       {timeAgo(app.stageEnteredAt)}
                     </span>
-                    {can("pipeline:reject") && app.status === "ACTIVE" && stage.kind !== "REJECTED" && (
-                      <button className="text-[11px] text-red-600 hover:underline" onClick={() => setRejecting(app)}>
-                        Reject
-                      </button>
-                    )}
+                    <span className="flex items-center gap-2">
+                      {can("interview:schedule") && app.status === "ACTIVE" && (
+                        <button className="text-[11px] text-brand-600 hover:underline" onClick={() => setScheduling(app)}>
+                          Interview
+                        </button>
+                      )}
+                      {can("pipeline:reject") && app.status === "ACTIVE" && stage.kind !== "REJECTED" && (
+                        <button className="text-[11px] text-red-600 hover:underline" onClick={() => setRejecting(app)}>
+                          Reject
+                        </button>
+                      )}
+                    </span>
                   </div>
                 </li>
               ))}
@@ -267,6 +278,21 @@ function PipelineBoard({ jobId }: { jobId: string }) {
           void load();
         }}
       />
+
+      {scheduling && (
+        <ScheduleInterviewModal
+          open
+          onClose={() => setScheduling(null)}
+          applicationId={scheduling.id}
+          candidateName={scheduling.candidate.fullName}
+          jobTitle={board.job.title}
+          onScheduled={(id) => {
+            setScheduling(null);
+            void load();
+            router.push(`/interviews/${id}`);
+          }}
+        />
+      )}
     </>
   );
 }

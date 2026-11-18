@@ -48,6 +48,10 @@ model User {
   memberships Membership[]
   sessions    Session[]
   tokens      UserToken[]
+
+  interviewSlots InterviewParticipant[]
+  scorecards     Scorecard[]
+  availability   InterviewerAvailability[]
 }
 
 model Organization {
@@ -80,6 +84,15 @@ model Organization {
   activities   Activity[]
   batches      UploadBatch[]
   aiUsage      AiUsage[]
+
+  questions          InterviewQuestion[]
+  interviewTemplates InterviewTemplate[]
+  interviews         Interview[]
+  scorecards         Scorecard[]
+  availability       InterviewerAvailability[]
+  emailTemplates     EmailTemplate[]
+  emailAutomations   EmailAutomation[]
+  communications     Communication[]
 }
 
 model Membership {
@@ -211,11 +224,14 @@ model Job {
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  applications Application[]
-  matches      MatchResult[]
-  batches      UploadBatch[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department         Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  applications       Application[]
+  matches            MatchResult[]
+  batches            UploadBatch[]
+  questions          InterviewQuestion[]
+  interviewTemplates InterviewTemplate[]
+  interviews         Interview[]
 
   @@index([organizationId, status])
 }
@@ -244,8 +260,9 @@ model PipelineStage {
   color          String?
   createdAt      DateTime  @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   applications Application[]
+  automations  EmailAutomation[]
 
   @@index([organizationId, position])
 }
@@ -296,11 +313,13 @@ model Candidate {
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  resumes      Resume[]
-  applications Application[]
-  matches      MatchResult[]
-  notes        Note[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  resumes        Resume[]
+  applications   Application[]
+  matches        MatchResult[]
+  notes          Note[]
+  interviews     Interview[]
+  communications Communication[]
 
   @@index([organizationId, email])
   @@index([organizationId, phone])
@@ -390,12 +409,14 @@ model Application {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  candidate    Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  stage        PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
-  matches      MatchResult[]
-  notes        Note[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job            Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate      Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  stage          PipelineStage   @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  matches        MatchResult[]
+  notes          Note[]
+  interviews     Interview[]
+  communications Communication[]
 
   @@unique([jobId, candidateId])
   @@index([organizationId, stageId])
@@ -526,4 +547,354 @@ model AiUsage {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
+}
+
+// ═══════════════════════ Phase 2: Interviews ═══════════════════════
+
+enum QuestionCategory {
+  TECHNICAL
+  BEHAVIORAL
+  SITUATIONAL
+  HR
+  ROLE_SPECIFIC
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+/// Reusable question bank. AI-generated questions land here as drafts for human curation.
+model InterviewQuestion {
+  id             String             @id @default(cuid())
+  organizationId String
+  text           String
+  category       QuestionCategory
+  difficulty     QuestionDifficulty @default(MEDIUM)
+  skills         String[]
+  /// What a good answer covers - shown to interviewers, never to candidates.
+  guidance       String?
+  /// Why this question was suggested for a candidate (e.g. a resume claim to probe).
+  rationale      String?
+  jobId          String?
+  source         AnalysisMethod     @default(HEURISTIC)
+  model          String?
+  promptVersion  String?
+  approved       Boolean            @default(false)
+  archivedAt     DateTime?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job?                    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  usages       InterviewQuestionItem[]
+
+  @@index([organizationId, category])
+  @@index([organizationId, jobId])
+}
+
+enum InterviewKind {
+  SCREENING
+  TECHNICAL
+  BEHAVIORAL
+  PANEL
+  HR
+  FINAL
+}
+
+/// Named interview format: duration, question set and the scorecard criteria to rate against.
+model InterviewTemplate {
+  id              String        @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  jobId           String?
+  kind            InterviewKind @default(TECHNICAL)
+  durationMinutes Int           @default(60)
+  /// ScorecardCriterion[] - see scorecard-criteria.ts. Weights must total 100.
+  criteria        Json
+  questionIds     String[]
+  isDefault       Boolean       @default(false)
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  interviews   Interview[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, jobId])
+}
+
+enum InterviewMode {
+  VIDEO
+  PHONE
+  ONSITE
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Interview {
+  id                String          @id @default(cuid())
+  organizationId    String
+  applicationId     String
+  jobId             String
+  candidateId       String
+  templateId        String?
+  title             String
+  kind              InterviewKind   @default(TECHNICAL)
+  round             Int             @default(1)
+  mode              InterviewMode   @default(VIDEO)
+  /// Stored in UTC; `timezone` is the IANA zone the organizer scheduled in.
+  startsAt          DateTime
+  endsAt            DateTime
+  timezone          String
+  location          String?
+  meetingLink       String?
+  agenda            String?
+  status            InterviewStatus @default(SCHEDULED)
+  /// Set when this interview replaced an earlier one, so the history stays intact.
+  rescheduledFromId String?         @unique
+  cancelReason      String?
+  cancelledAt       DateTime?
+  completedAt       DateTime?
+  /// Snapshot of the template's criteria, so later template edits don't rewrite history.
+  criteria          Json
+  createdById       String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  application     Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job             Job                     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate       Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  template        InterviewTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  rescheduledFrom Interview?              @relation("Reschedule", fields: [rescheduledFromId], references: [id], onDelete: SetNull)
+  rescheduledTo   Interview?              @relation("Reschedule")
+  participants    InterviewParticipant[]
+  questions       InterviewQuestionItem[]
+  scorecards      Scorecard[]
+  communications  Communication[]
+
+  @@index([organizationId, startsAt])
+  @@index([applicationId, round])
+  @@index([candidateId])
+}
+
+enum ParticipantRole {
+  LEAD
+  PANEL
+  OBSERVER
+}
+
+enum ParticipantResponse {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model InterviewParticipant {
+  id          String              @id @default(cuid())
+  interviewId String
+  userId      String
+  role        ParticipantRole     @default(PANEL)
+  response    ParticipantResponse @default(PENDING)
+  respondedAt DateTime?
+  createdAt   DateTime            @default(now())
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewId, userId])
+  @@index([userId])
+}
+
+/// Questions attached to one interview. Text is copied so later bank edits don't alter the record.
+model InterviewQuestionItem {
+  id          String             @id @default(cuid())
+  interviewId String
+  questionId  String?
+  text        String
+  category    QuestionCategory
+  difficulty  QuestionDifficulty
+  guidance    String?
+  rationale   String?
+  position    Int
+
+  interview Interview          @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  question  InterviewQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([interviewId, position])
+}
+
+enum Recommendation {
+  STRONG_YES
+  YES
+  LEAN_YES
+  LEAN_NO
+  NO
+  STRONG_NO
+}
+
+/// One interviewer's structured feedback. Ratings are human input; AI never writes a scorecard.
+model Scorecard {
+  id             String          @id @default(cuid())
+  organizationId String
+  interviewId    String
+  interviewerId  String
+  /// { [criterionId]: { rating: 1-5, comment?: string } }
+  ratings        Json
+  overallRating  Float?
+  recommendation Recommendation?
+  strengths      String?
+  concerns       String?
+  notes          String?
+  /// AI-written recap of this interviewer's own notes. Advisory, clearly labelled.
+  aiSummary      String?
+  aiModel        String?
+  submittedAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  interview    Interview    @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  interviewer  User         @relation(fields: [interviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewId, interviewerId])
+  @@index([organizationId, submittedAt])
+}
+
+/// Recurring weekly availability per interviewer, in the organization's timezone.
+model InterviewerAvailability {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /// 0 = Sunday through 6 = Saturday
+  weekday        Int
+  startMinute    Int
+  endMinute      Int
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId])
+}
+
+// ═══════════════════════ Phase 2: Communications ═══════════════════════
+
+enum TemplateKey {
+  APPLICATION_RECEIVED
+  SHORTLISTED
+  INTERVIEW_INVITATION
+  INTERVIEW_REMINDER
+  INTERVIEW_RESCHEDULED
+  INTERVIEW_CANCELLED
+  ASSESSMENT_INVITATION
+  SELECTED
+  REJECTED
+  OFFER
+  CUSTOM
+}
+
+model EmailTemplate {
+  id             String      @id @default(cuid())
+  organizationId String
+  key            TemplateKey
+  name           String
+  subject        String
+  body           String
+  enabled        Boolean     @default(true)
+  isDefault      Boolean     @default(false)
+  createdById    String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  automations    EmailAutomation[]
+  communications Communication[]
+
+  @@index([organizationId, key])
+}
+
+enum AutomationTrigger {
+  APPLICATION_CREATED
+  STAGE_CHANGED
+  INTERVIEW_SCHEDULED
+  INTERVIEW_RESCHEDULED
+  INTERVIEW_CANCELLED
+  INTERVIEW_REMINDER
+  APPLICATION_REJECTED
+  CANDIDATE_HIRED
+}
+
+/// Fires a template when something happens. Off by default; a human turns each one on.
+model EmailAutomation {
+  id             String            @id @default(cuid())
+  organizationId String
+  trigger        AutomationTrigger
+  /// Only for STAGE_CHANGED: which stage entry fires this.
+  stageId        String?
+  templateId     String
+  enabled        Boolean           @default(false)
+  /// Lead time in hours for INTERVIEW_REMINDER.
+  offsetHours    Int               @default(24)
+  updatedById    String?
+  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime          @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  template     EmailTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stage        PipelineStage? @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, trigger, stageId])
+}
+
+enum CommunicationStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// Every message the platform sends, with its outcome. Append-only history.
+model Communication {
+  id             String              @id @default(cuid())
+  organizationId String
+  candidateId    String?
+  applicationId  String?
+  interviewId    String?
+  templateId     String?
+  templateKey    TemplateKey?
+  trigger        AutomationTrigger?
+  toEmail        String
+  subject        String
+  body           String
+  status         CommunicationStatus @default(QUEUED)
+  error          String?
+  /// Set when a send was deliberately not made (e.g. no email on file).
+  skipReason     String?
+  sentAt         DateTime?
+  /// Null when an automation sent it rather than a person.
+  sentById       String?
+  automated      Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  candidate    Candidate?     @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  application  Application?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  interview    Interview?     @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  template     EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([candidateId, createdAt])
+  @@index([applicationId])
 }

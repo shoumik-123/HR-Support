@@ -1,7 +1,8 @@
 # Veyra Talent
 
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
-This repository is **Phase 1** of the product plan: core recruitment and AI screening.
+This repository covers **Phase 1** (core recruitment and AI screening) and **Phase 2**
+(interview and communication automation) of the product plan.
 
 ```
 apps/api   NestJS + Prisma + PostgreSQL API, background worker, Claude integration
@@ -90,8 +91,20 @@ resumes, applications, match history, notes, activity, consent status, data expo
 **Analytics** — funnel, conversion rates, time to hire, job performance, resume-processing success
 rate, and AI oversight metrics.
 
-Not yet built (later phases): interview scheduling, assessments, offers and onboarding, the public
-career portal, WhatsApp/email automation, and billing.
+**Interview intelligence** (Phase 2) — AI question generation grounded in the job and the
+candidate's own documented experience, a curated question bank with human approval, reusable
+interview templates, and per-interviewer scorecards with weighted criteria and panel aggregation.
+
+**Interview scheduling** (Phase 2) — weekly interviewer availability, free-slot search across a
+panel, double-booking detection with a deliberate override, rescheduling and cancellation,
+timezone-correct times, and calendar (.ics) invitations.
+
+**Communications** (Phase 2) — editable email templates with validated placeholders, live preview
+against a real application, trigger-based automation that is off until switched on, one-off and bulk
+sending, and a full delivery log with retry.
+
+Not yet built (later phases): assessments, offers and onboarding, the public career portal, WhatsApp
+integration, and billing.
 
 ## How AI is used
 
@@ -117,6 +130,24 @@ decisions:
 Blind recruitment mode additionally hides candidate identity in the UI; revealing a candidate is
 permission-gated and audited.
 
+The same principles carry into interviews and communications:
+
+- **Interview questions are drafts.** AI-generated questions are saved unapproved and must be
+  reviewed before they can be used in a template. Each carries a rationale naming the job
+  requirement or resume claim it probes, and the prompt forbids questions touching age, gender,
+  religion, nationality, marital or family status, disability, or health.
+- **Candidate identity is stripped before question generation**, exactly as it is before matching.
+- **Interviewers are not anchored by each other.** While you still owe feedback on an interview, you
+  see only your own scorecard — whatever else your role permits. The panel's ratings appear once you
+  submit, and submitted feedback is locked.
+- **The panel summary reports, it does not decide.** It gives per-criterion averages and flags
+  disagreement as something to discuss; it produces no hire or reject verdict.
+- **Candidate-facing automation is off by default.** Every rule is switched on deliberately by an HR
+  manager, and enabling one is written to the audit log. Rejection remains a human action; the
+  automation only sends the notification afterwards.
+- **Every message is logged** with its outcome — sent, failed, or skipped with the reason — and
+  whether a person or an automation sent it.
+
 ## Security
 
 Tenant isolation is enforced in one place: the global `AuthGuard` resolves the active organization
@@ -135,15 +166,27 @@ applications, match history and stored files.
 ## Testing
 
 ```bash
-cd apps/api && pnpm test        # 54 unit tests
+cd apps/api
+pnpm test                # 111 unit tests
+
+# End-to-end, against a running API with seeded demo data:
+pnpm db:seed && pnpm test:e2e          # Phase 1 — 52 checks
+pnpm db:seed && pnpm test:e2e:phase2   # Phase 2 — 86 checks
 ```
 
-Covering the matching algorithm and its weighting, the AI matcher's score aggregation and evidence
-filtering, redaction of protected characteristics, resume parsing and experience estimation, the
-skills taxonomy, file-type detection, and the role/permission matrix including blind mode.
+Unit tests cover the matching algorithm and its weighting, the AI matcher's score aggregation and
+evidence filtering, redaction of protected characteristics, resume parsing and experience
+estimation, the skills taxonomy, file-type detection, the role/permission matrix including blind
+mode, scheduling arithmetic (timezone conversion across DST, overlap and conflict rules, free-slot
+search, .ics generation), scorecard weighting and panel aggregation, and email template rendering.
 
-The end-to-end suite used during development exercises the running API — authentication, RBAC,
-tenant isolation, matching and review, the pipeline, blind mode, uploads and validation (52 checks).
+The end-to-end suites exercise the running API: authentication, RBAC, tenant isolation, matching and
+review, the pipeline, blind mode, uploads and validation; then templates and automation gating,
+availability and slot search, scheduling with conflict handling, question generation, scorecards and
+anti-anchoring, reschedule and cancel, and the communication log.
+
+Run each suite against a fresh seed — the Phase 1 suite rejects an application, which leaves fewer
+active candidates than the Phase 2 suite expects.
 
 ## Architecture notes
 
@@ -153,7 +196,14 @@ tenant isolation, matching and review, the pipeline, blind mode, uploads and val
 - **Storage** is behind a small interface with a local-disk driver, so moving to S3-compatible
   object storage touches one file.
 - **Matching** has two interchangeable implementations behind one type. The rule-based matcher is a
-  pure function, which is why it is cheap to test and safe to use as the AI fallback.
+  pure function, which is why it is cheap to test and safe to use as the AI fallback. Interview
+  question generation follows the same pattern.
+- **Scheduling arithmetic is pure** (`apps/api/src/interviews/scheduling.ts`): timezone conversion
+  uses `Intl` rather than a date library, and conflict detection, availability and free-slot search
+  are all functions over plain data, so the awkward cases (DST, back-to-back bookings, partial
+  panel availability) are covered by fast unit tests.
+- **Interview criteria are snapshotted** onto each interview when it is scheduled, so editing a
+  template later never rewrites feedback that has already been given.
 - **Prisma 7** with the `prisma-client` generator; generated code lives in `apps/api/src/generated`
   and is not committed.
 
@@ -162,6 +212,7 @@ tenant isolation, matching and review, the pipeline, blind mode, uploads and val
 1. Move resume storage to S3-compatible object storage.
 2. Run workers as separate instances (`RUN_WORKER=false` on web-facing API nodes).
 3. Enable ClamAV (`CLAMAV_HOST`) — uploads are type-checked but not virus-scanned without it.
-4. Configure SMTP; until then, invitations and resets only appear in the API log.
+4. Configure SMTP; until then, every email — invitations, interview invites, resets — is written to
+   the API log instead of being delivered. The Communications log will show them as sent.
 5. Put the API behind TLS and set `NODE_ENV=production` so refresh cookies are `Secure`.
 6. Add Postgres read replicas or pgvector-backed semantic search as the talent pool grows.

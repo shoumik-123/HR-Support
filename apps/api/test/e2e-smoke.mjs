@@ -31,7 +31,9 @@ async function login(email) {
   for (let i = 0; i < 8; i++) {
     r = await call("/auth/login", { body: { email, password: "Veyra12345" } });
     if (r.status !== 429) break;
-    await new Promise((x) => setTimeout(x, 8000)); // login rate limit is deliberate; wait it out
+    // The login rate limit is a deliberate security control and counts blocked attempts
+    // too, so wait out a full window rather than retrying tightly.
+    await new Promise((x) => setTimeout(x, 20_000));
   }
   if (r.status !== 200) throw new Error(`login ${email} failed: ${r.status}`);
   const me = await call("/auth/me", { token: r.body.accessToken, expect: 200 });

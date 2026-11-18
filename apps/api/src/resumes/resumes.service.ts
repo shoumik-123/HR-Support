@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { ActivityService } from "../common/activity.service";
+import { CommunicationsService } from "../communications/communications.service";
 import { RequestContext } from "../common/context";
 import { sha256 } from "../common/crypto";
 import { config } from "../config";
@@ -42,6 +43,7 @@ export class ResumesService implements OnModuleInit {
     private readonly parser: ResumeParserService,
     private readonly scanner: MalwareScanner,
     private readonly activity: ActivityService,
+    private readonly comms: CommunicationsService,
   ) {}
 
   onModuleInit() {

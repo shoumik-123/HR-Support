@@ -4,12 +4,13 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { MatchDetail } from "@/components/match-detail";
+import { PanelFeedback } from "@/components/panel-feedback";
 import { Alert, ConfidenceBar, Modal, PageHeader, ScoreBadge, Spinner, timeAgo } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
-import type { Candidate360, MatchResult } from "@/lib/types";
+import type { ApplicationFeedback, Candidate360, MatchResult, RecommendationValue } from "@/lib/types";
 
-type Tab = "profile" | "applications" | "resumes" | "notes" | "activity";
+type Tab = "profile" | "applications" | "interviews" | "resumes" | "notes" | "activity";
 
 export default function CandidatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -80,7 +81,7 @@ function Candidate({ id }: { id: string }) {
       )}
 
       <div className="my-4 flex gap-1 overflow-x-auto border-b" style={{ borderColor: "var(--border)" }} role="tablist">
-        {(["profile", "applications", "resumes", "notes", "activity"] as Tab[]).map((t) => (
+        {(["profile", "applications", "interviews", "resumes", "notes", "activity"] as Tab[]).map((t) => (
           <button
             key={t}
             role="tab"
@@ -188,6 +189,7 @@ function Candidate({ id }: { id: string }) {
       )}
 
       {tab === "applications" && <Applications candidate={candidate} onChange={() => void load()} />}
+      {tab === "interviews" && <Interviews candidate={candidate} />}
       {tab === "resumes" && <Resumes candidate={candidate} />}
       {tab === "notes" && <Notes candidate={candidate} onChange={() => void load()} />}
       {tab === "activity" && <Activity candidate={candidate} />}
@@ -295,6 +297,93 @@ function Applications({ candidate, onChange }: { candidate: Candidate360; onChan
         {open && <MatchDetail match={open} onReviewed={onChange} />}
       </Modal>
     </>
+  );
+}
+
+const RECOMMENDATION_LABEL: Record<RecommendationValue, string> = {
+  STRONG_YES: "Strong yes", YES: "Yes", LEAN_YES: "Leaning yes", LEAN_NO: "Leaning no", NO: "No", STRONG_NO: "Strong no",
+};
+
+/** Interview history across every application this candidate has. */
+function Interviews({ candidate }: { candidate: Candidate360 }) {
+  const [rounds, setRounds] = useState<ApplicationFeedback[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!candidate.applications.length) {
+      setRounds([]);
+      return;
+    }
+    Promise.all(candidate.applications.map((a) => api<ApplicationFeedback[]>(`/applications/${a.id}/interviews`)))
+      .then((lists) => setRounds(lists.flat().sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())))
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load interviews"));
+  }, [candidate.applications]);
+
+  if (error) return <Alert>{error}</Alert>;
+  if (!rounds) return <Spinner />;
+  if (!rounds.length) {
+    return (
+      <p className="card p-6 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+        No interviews have been held with this candidate yet.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="space-y-4">
+      {rounds.map((round) => (
+        <li key={round.id} className="card p-5">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <Link className="font-medium hover:underline" href={`/interviews/${round.id}`}>
+                {round.title}
+              </Link>
+              <p className="mt-0.5 text-sm" style={{ color: "var(--text-muted)" }}>
+                Round {round.round} · {new Date(round.startsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} ·{" "}
+                {round.status.replace("_", " ").toLowerCase()}
+              </p>
+            </div>
+            <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+              {round.panel.submitted} of {round.panel.submitted + round.panel.pending} reported
+            </span>
+          </div>
+
+          {round.panel.split && <Alert kind="warning">The panel disagreed on this round — worth reading both views.</Alert>}
+
+          {round.scorecards.filter((s) => s.submittedAt).length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              No feedback submitted for this round yet.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {round.scorecards
+                .filter((s) => s.submittedAt)
+                .map((card) => (
+                  <li key={card.id} className="rounded-lg p-3" style={{ background: "var(--surface-sunken)" }}>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-sm font-medium">{card.interviewer?.name ?? "Interviewer"}</p>
+                      <span className="flex items-center gap-2">
+                        {card.recommendation && <span className="chip text-xs">{RECOMMENDATION_LABEL[card.recommendation]}</span>}
+                        {card.overallRating != null && <span className="text-sm font-medium tabular-nums">{card.overallRating}/5</span>}
+                      </span>
+                    </div>
+                    {card.strengths && (
+                      <p className="mt-1.5 text-sm">
+                        <span className="font-medium">Strengths:</span> {card.strengths}
+                      </p>
+                    )}
+                    {card.concerns && (
+                      <p className="mt-1 text-sm">
+                        <span className="font-medium">Concerns:</span> {card.concerns}
+                      </p>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

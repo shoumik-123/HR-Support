@@ -12,7 +12,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "prisma:generate": "prisma generate",
-    "test:e2e": "node test/e2e-smoke.mjs"
+    "test:e2e": "node test/e2e-smoke.mjs",
+    "test:e2e:phase2": "node test/e2e-phase2.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",

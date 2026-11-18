@@ -277,3 +277,274 @@ export interface JobPerformance {
   matchesRun: number;
   timeToHireDays: number | null;
 }
+
+// ───────────────────────── Phase 2: Interviews ─────────────────────────
+
+export type QuestionCategory = "TECHNICAL" | "BEHAVIORAL" | "SITUATIONAL" | "HR" | "ROLE_SPECIFIC";
+export type QuestionDifficulty = "EASY" | "MEDIUM" | "HARD";
+export type InterviewKind = "SCREENING" | "TECHNICAL" | "BEHAVIORAL" | "PANEL" | "HR" | "FINAL";
+export type InterviewMode = "VIDEO" | "PHONE" | "ONSITE";
+export type InterviewStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+export type ParticipantRole = "LEAD" | "PANEL" | "OBSERVER";
+export type ParticipantResponse = "PENDING" | "ACCEPTED" | "DECLINED";
+export type RecommendationValue = "STRONG_YES" | "YES" | "LEAN_YES" | "LEAN_NO" | "NO" | "STRONG_NO";
+
+export interface ScorecardCriterion {
+  id: string;
+  label: string;
+  description?: string;
+  weight: number;
+}
+
+export interface Rating {
+  rating: number;
+  comment?: string;
+}
+
+export interface Scorecard {
+  id: string;
+  interviewerId: string;
+  interviewer?: { id: string; name: string };
+  ratings: Record<string, Rating>;
+  overallRating: number | null;
+  recommendation: RecommendationValue | null;
+  strengths: string | null;
+  concerns: string | null;
+  notes: string | null;
+  aiSummary: string | null;
+  aiModel: string | null;
+  submittedAt: string | null;
+}
+
+export interface PanelSummary {
+  submitted: number;
+  pending: number;
+  averageRating: number | null;
+  perCriterion: { id: string; label: string; average: number | null; ratings: number[] }[];
+  recommendations: Partial<Record<RecommendationValue, number>>;
+  split: boolean;
+  consensus: "positive" | "negative" | "mixed" | "insufficient";
+}
+
+export interface InterviewQuestionItem {
+  id: string;
+  questionId: string | null;
+  text: string;
+  category: QuestionCategory;
+  difficulty: QuestionDifficulty;
+  guidance: string | null;
+  rationale: string | null;
+  position: number;
+}
+
+export interface GeneratedQuestion {
+  text: string;
+  category: QuestionCategory;
+  difficulty: QuestionDifficulty;
+  skills: string[];
+  guidance: string;
+  rationale: string;
+}
+
+export interface BankQuestion {
+  id: string;
+  text: string;
+  category: QuestionCategory;
+  difficulty: QuestionDifficulty;
+  skills: string[];
+  guidance: string | null;
+  rationale: string | null;
+  jobId: string | null;
+  job?: { id: string; title: string } | null;
+  source: AnalysisMethod;
+  model: string | null;
+  promptVersion: string | null;
+  approved: boolean;
+  createdAt: string;
+  _count?: { usages: number };
+}
+
+export interface InterviewTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  jobId: string | null;
+  job?: { id: string; title: string } | null;
+  kind: InterviewKind;
+  durationMinutes: number;
+  criteria: ScorecardCriterion[];
+  questionIds: string[];
+  isDefault: boolean;
+}
+
+export interface InterviewParticipantView {
+  id: string;
+  userId: string;
+  role: ParticipantRole;
+  response: ParticipantResponse;
+  user: { id: string; name: string; email?: string };
+}
+
+export interface InterviewListItem {
+  id: string;
+  title: string;
+  kind: InterviewKind;
+  mode: InterviewMode;
+  status: InterviewStatus;
+  round: number;
+  startsAt: string;
+  endsAt: string;
+  timezone: string;
+  candidate: CandidateSummary;
+  job: { id: string; title: string };
+  participants: InterviewParticipantView[];
+  feedbackSubmitted: number;
+  feedbackPending: number;
+}
+
+export interface InterviewDetail extends Omit<InterviewListItem, "feedbackSubmitted" | "feedbackPending"> {
+  location: string | null;
+  meetingLink: string | null;
+  agenda: string | null;
+  cancelReason: string | null;
+  criteria: ScorecardCriterion[];
+  questions: InterviewQuestionItem[];
+  scorecards: Scorecard[];
+  panel: PanelSummary;
+  myScorecardId: string | null;
+  canSeePanelFeedback: boolean;
+  isParticipant: boolean;
+  application: { id: string; stageId: string; status: string };
+  template?: { id: string; name: string } | null;
+}
+
+export interface CalendarResponse {
+  timezone: string;
+  interviews: {
+    id: string;
+    title: string;
+    kind: InterviewKind;
+    mode: InterviewMode;
+    status: InterviewStatus;
+    startsAt: string;
+    endsAt: string;
+    timezone: string;
+    localLabel: string;
+    candidate: CandidateSummary;
+    job: { id: string; title: string };
+    interviewers: { id: string; name: string; role: ParticipantRole; response: ParticipantResponse }[];
+  }[];
+}
+
+export interface InterviewerOption {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  availabilityWindows: number;
+}
+
+export interface SlotSuggestion {
+  timezone: string;
+  withoutDeclaredHours: string[];
+  slots: { start: string; end: string; label: string }[];
+}
+
+export interface SlotConflict {
+  userId: string;
+  interviewId: string;
+  interviewerName?: string;
+  start: string;
+  end: string;
+}
+
+export interface AvailabilityResponse {
+  userId: string;
+  timezone: string;
+  slots: { id: string; weekday: number; startMinute: number; endMinute: number }[];
+}
+
+export interface ApplicationFeedback {
+  id: string;
+  title: string;
+  kind: InterviewKind;
+  round: number;
+  status: InterviewStatus;
+  startsAt: string;
+  timezone: string;
+  criteria: ScorecardCriterion[];
+  panel: PanelSummary;
+  scorecards: Scorecard[];
+}
+
+// ───────────────────────── Phase 2: Communications ─────────────────────────
+
+export type TemplateKey =
+  | "APPLICATION_RECEIVED" | "SHORTLISTED" | "INTERVIEW_INVITATION" | "INTERVIEW_REMINDER"
+  | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "ASSESSMENT_INVITATION" | "SELECTED"
+  | "REJECTED" | "OFFER" | "CUSTOM";
+
+export type AutomationTrigger =
+  | "APPLICATION_CREATED" | "STAGE_CHANGED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED"
+  | "INTERVIEW_CANCELLED" | "INTERVIEW_REMINDER" | "APPLICATION_REJECTED" | "CANDIDATE_HIRED";
+
+export type CommunicationStatus = "QUEUED" | "SENT" | "FAILED" | "SKIPPED";
+
+export interface EmailTemplate {
+  id: string;
+  key: TemplateKey;
+  name: string;
+  subject: string;
+  body: string;
+  enabled: boolean;
+  isDefault: boolean;
+  variables: { known: string[]; unknown: string[] };
+}
+
+export interface AutomationRule {
+  id: string;
+  trigger: AutomationTrigger;
+  stageId: string | null;
+  templateId: string;
+  enabled: boolean;
+  offsetHours: number;
+  template: { id: string; name: string; key: TemplateKey };
+  stage: { id: string; name: string } | null;
+}
+
+export interface AutomationsResponse {
+  rules: AutomationRule[];
+  templates: { id: string; name: string; key: TemplateKey }[];
+  stages: { id: string; name: string; kind: StageKind }[];
+}
+
+export interface Communication {
+  id: string;
+  candidateId: string | null;
+  applicationId: string | null;
+  interviewId: string | null;
+  templateKey: TemplateKey | null;
+  trigger: AutomationTrigger | null;
+  toEmail: string;
+  subject: string;
+  body: string;
+  status: CommunicationStatus;
+  error: string | null;
+  skipReason: string | null;
+  sentAt: string | null;
+  automated: boolean;
+  createdAt: string;
+  candidate?: { id: string; fullName: string } | null;
+  template?: { name: string } | null;
+  sentByName: string | null;
+}
+
+export interface CommunicationStats {
+  periodDays: number;
+  sent: number;
+  queued: number;
+  failed: number;
+  skipped: number;
+  automated: number;
+  deliveryRate: number | null;
+}

@@ -11,6 +11,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import type { Role } from "../src/generated/prisma/enums";
 import { DEFAULT_STAGES } from "../src/orgs/defaults";
+import { DEFAULT_TEMPLATES } from "../src/communications/default-templates";
+import { criteriaForKind } from "../src/interviews/scorecard-criteria";
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 const storageDir = path.resolve(process.env.STORAGE_DIR ?? "./storage");
@@ -297,10 +299,215 @@ async function main() {
     }
   }
 
+  // ── Phase 2: templates, availability, interviews with feedback ──
+
+  await prisma.emailTemplate.createMany({
+    data: DEFAULT_TEMPLATES.map((t) => ({ ...t, organizationId: org.id, isDefault: true })),
+  });
+
+  // Weekly hours: Sunday to Thursday, 10:00-18:00 (the working week in Bangladesh)
+  // for the HR manager, the recruiter and the hiring manager.
+  await prisma.interviewerAvailability.createMany({
+    data: [users[1].id, users[2].id, users[3].id].flatMap((userId) =>
+      [0, 1, 2, 3, 4].map((weekday) => ({ organizationId: org.id, userId, weekday, startMinute: 10 * 60, endMinute: 18 * 60 })),
+    ),
+  });
+
+  const technicalTemplate = await prisma.interviewTemplate.create({
+    data: {
+      organizationId: org.id,
+      name: "Engineering technical screen",
+      description: "60-minute technical conversation with a senior engineer.",
+      kind: "TECHNICAL",
+      durationMinutes: 60,
+      criteria: criteriaForKind("TECHNICAL"),
+      createdById: owner.id,
+      isDefault: true,
+    },
+  });
+  await prisma.interviewTemplate.create({
+    data: {
+      organizationId: org.id,
+      name: "Hiring manager conversation",
+      description: "45 minutes on ways of working and motivation.",
+      kind: "BEHAVIORAL",
+      durationMinutes: 45,
+      criteria: criteriaForKind("BEHAVIORAL"),
+      createdById: owner.id,
+    },
+  });
+
+  const questionSeeds = [
+    {
+      text: "Walk me through how you would design a multi-tenant data model where every query must be scoped to one organization. What would you do to stop data leaking between tenants?",
+      category: "TECHNICAL" as const,
+      difficulty: "HARD" as const,
+      skills: ["PostgreSQL", "System Design"],
+      guidance: "Strong answers reach for a tenant column enforced at one choke point, plus tests that prove isolation. A thin answer only mentions adding a WHERE clause.",
+      rationale: "The role works on a multi-tenant SaaS product.",
+    },
+    {
+      text: "Tell me about a React performance problem you have fixed. How did you find it, and how did you confirm the fix worked?",
+      category: "TECHNICAL" as const,
+      difficulty: "MEDIUM" as const,
+      skills: ["React"],
+      guidance: "Look for measurement before and after rather than guesswork. Naming a specific tool and a number is a good sign.",
+      rationale: "React is a required skill on this job.",
+    },
+    {
+      text: "Describe a time you disagreed with a colleague about a technical decision. How did you handle it, and what was the outcome?",
+      category: "BEHAVIORAL" as const,
+      difficulty: "MEDIUM" as const,
+      skills: ["Collaboration"],
+      guidance: "Look for genuine engagement with the other view and a concrete outcome. Dismissiveness or blame throughout is a concern.",
+      rationale: "The role involves mentoring and architecture discussions.",
+    },
+    {
+      text: "How do you decide what to test, and what to leave untested?",
+      category: "TECHNICAL" as const,
+      difficulty: "MEDIUM" as const,
+      skills: ["Unit Testing"],
+      guidance: "A thoughtful answer trades risk against cost. Dogma in either direction is worth probing.",
+      rationale: "Code and design quality is one of the scorecard criteria.",
+    },
+    {
+      text: "Which part of this role are you most confident about, and where would you want support in your first few months?",
+      category: "ROLE_SPECIFIC" as const,
+      difficulty: "EASY" as const,
+      skills: [],
+      guidance: "Self-awareness matters more than the specific gap named. Claiming no gaps at all is worth exploring.",
+      rationale: "Gives the candidate a fair chance to describe strengths and gaps in their own words.",
+    },
+  ];
+
+  const questions = await Promise.all(
+    questionSeeds.map((q) =>
+      prisma.interviewQuestion.create({
+        data: { ...q, organizationId: org.id, jobId: seniorEngineer.id, approved: true, source: "HEURISTIC", createdById: owner.id },
+      }),
+    ),
+  );
+  await prisma.interviewTemplate.update({
+    where: { id: technicalTemplate.id },
+    data: { questionIds: questions.slice(0, 4).map((q) => q.id) },
+  });
+
+  // A completed interview with real panel feedback, so the UI has something to show.
+  const firstApplication = await prisma.application.findFirst({
+    where: { organizationId: org.id, jobId: seniorEngineer.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (firstApplication) {
+    const criteria = criteriaForKind("TECHNICAL");
+    const held = new Date(Date.now() - 2 * 86_400_000);
+    held.setHours(15, 0, 0, 0);
+
+    const interview = await prisma.interview.create({
+      data: {
+        organizationId: org.id,
+        applicationId: firstApplication.id,
+        jobId: seniorEngineer.id,
+        candidateId: firstApplication.candidateId,
+        templateId: technicalTemplate.id,
+        title: "Technical interview: Senior Full Stack Engineer",
+        kind: "TECHNICAL",
+        round: 1,
+        mode: "VIDEO",
+        startsAt: held,
+        endsAt: new Date(held.getTime() + 60 * 60_000),
+        timezone: org.timezone,
+        meetingLink: "https://meet.example.com/veyra-demo",
+        agenda: "Introductions, two technical scenarios, then candidate questions.",
+        status: "COMPLETED",
+        completedAt: new Date(held.getTime() + 60 * 60_000),
+        criteria,
+        createdById: recruiter.id,
+        participants: {
+          create: [
+            { userId: users[3].id, role: "LEAD", response: "ACCEPTED", respondedAt: held },
+            { userId: users[2].id, role: "PANEL", response: "ACCEPTED", respondedAt: held },
+          ],
+        },
+        questions: {
+          create: questions.slice(0, 4).map((q, position) => ({
+            questionId: q.id,
+            text: q.text,
+            category: q.category,
+            difficulty: q.difficulty,
+            guidance: q.guidance,
+            rationale: q.rationale,
+            position,
+          })),
+        },
+      },
+    });
+
+    // Two interviewers, deliberately not in perfect agreement.
+    const ratingsLead = Object.fromEntries(
+      criteria.map((c) => [c.id, { rating: c.id === "code_quality" ? 3 : 4, comment: "Gave concrete examples from recent work." }]),
+    );
+    const ratingsPanel = Object.fromEntries(
+      criteria.map((c) => [c.id, { rating: c.id === "technical_depth" ? 5 : 4, comment: "Reasoned clearly about trade-offs." }]),
+    );
+    await prisma.scorecard.createMany({
+      data: [
+        {
+          organizationId: org.id,
+          interviewId: interview.id,
+          interviewerId: users[3].id,
+          ratings: ratingsLead,
+          overallRating: 3.8,
+          recommendation: "YES",
+          strengths: "Solid grasp of multi-tenant data modelling. Walked through tenant scoping and how he would test for leaks.",
+          concerns: "Testing approach is lighter than I would like for a senior role. Worth probing in the next round.",
+          submittedAt: new Date(held.getTime() + 3 * 60 * 60_000),
+        },
+        {
+          organizationId: org.id,
+          interviewId: interview.id,
+          interviewerId: users[2].id,
+          ratings: ratingsPanel,
+          overallRating: 4.35,
+          recommendation: "STRONG_YES",
+          strengths: "Strongest technical depth we have seen for this role. Explained a real performance fix with before-and-after numbers.",
+          concerns: "Has not worked at our scale, though his reasoning suggests he would adapt.",
+          submittedAt: new Date(held.getTime() + 4 * 60 * 60_000),
+        },
+      ],
+    });
+
+    // A second round already on the calendar, a few days out.
+    const upcoming = new Date(Date.now() + 3 * 86_400_000);
+    upcoming.setHours(11, 0, 0, 0);
+    await prisma.interview.create({
+      data: {
+        organizationId: org.id,
+        applicationId: firstApplication.id,
+        jobId: seniorEngineer.id,
+        candidateId: firstApplication.candidateId,
+        title: "Hiring manager conversation: Senior Full Stack Engineer",
+        kind: "BEHAVIORAL",
+        round: 2,
+        mode: "VIDEO",
+        startsAt: upcoming,
+        endsAt: new Date(upcoming.getTime() + 45 * 60_000),
+        timezone: org.timezone,
+        meetingLink: "https://meet.example.com/veyra-demo-2",
+        criteria: criteriaForKind("BEHAVIORAL"),
+        createdById: recruiter.id,
+        participants: { create: [{ userId: users[3].id, role: "LEAD" }] },
+        scorecards: { create: [{ organizationId: org.id, interviewerId: users[3].id, ratings: {} }] },
+      },
+    });
+  }
+
   console.log(`\nDemo organization: ${org.name}`);
   console.log("Sign in with any of these (password: " + PASSWORD + "):");
   for (const t of TEAM) console.log(`  ${t.role.padEnd(14)} ${t.email}`);
-  console.log(`\n${CANDIDATES.length} candidates, 3 jobs. Run matching from a job to generate AI scores.`);
+  console.log(`\n${CANDIDATES.length} candidates, 3 jobs, ${questionSeeds.length} interview questions,`);
+  console.log("2 interviews (one completed with panel feedback) and 10 email templates.");
+  console.log("Run screening from a job to generate match scores.");
 }
 
 main()

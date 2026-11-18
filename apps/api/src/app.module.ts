@@ -11,12 +11,18 @@ import { ActivityModule } from "./common/activity.service";
 import { AuthGuard } from "./common/auth.guard";
 import { AllExceptionsFilter } from "./common/http-exception.filter";
 import { CandidatesController } from "./candidates/candidates.controller";
+import { CommunicationsController } from "./communications/communications.controller";
+import { CommunicationsService } from "./communications/communications.service";
 import { CandidatesService } from "./candidates/candidates.service";
 import { config } from "./config";
 import { DashboardController } from "./dashboard/dashboard.controller";
 import { DashboardService } from "./dashboard/dashboard.service";
 import { HealthController } from "./health.controller";
 import { JobsController } from "./jobs/jobs.controller";
+import { InterviewSetupController } from "./interviews/interview-setup.controller";
+import { InterviewsController } from "./interviews/interviews.controller";
+import { InterviewsService } from "./interviews/interviews.service";
+import { AvailabilityService, QuestionBankService } from "./interviews/question-bank.service";
 import { JobsService } from "./jobs/jobs.service";
 import { MailModule } from "./mail/mail.service";
 import { MatchingController } from "./matching/matching.controller";
@@ -51,6 +57,9 @@ import { StorageModule } from "./storage/storage.service";
     ResumesController,
     ApplicationsController,
     MatchingController,
+    InterviewsController,
+    InterviewSetupController,
+    CommunicationsController,
     DashboardController,
   ],
   providers: [
@@ -63,6 +72,10 @@ import { StorageModule } from "./storage/storage.service";
     MalwareScanner,
     ApplicationsService,
     MatchingService,
+    InterviewsService,
+    QuestionBankService,
+    AvailabilityService,
+    CommunicationsService,
     DashboardService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

@@ -10,6 +10,7 @@ import { JwtService } from "@nestjs/jwt";
 import bcrypt from "bcryptjs";
 import { ActivityService } from "../common/activity.service";
 import { newToken, sha256, slugify } from "../common/crypto";
+import { CommunicationsService } from "../communications/communications.service";
 import { permissionsFor } from "../common/permissions";
 import { config } from "../config";
 import { MailService } from "../mail/mail.service";
@@ -37,6 +38,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly activity: ActivityService,
+    private readonly comms: CommunicationsService,
   ) {}
 
   async register(input: { name: string; email: string; password: string; organizationName: string }, client: ClientInfo) {
@@ -52,6 +54,7 @@ export class AuthService {
       const org = await tx.organization.create({ data: { name: input.organizationName, slug } });
       await tx.membership.create({ data: { userId: user.id, organizationId: org.id, role: "OWNER" } });
       await createDefaultStages(tx, org.id);
+      await this.comms.ensureDefaults(org.id, tx);
       return { user, org };
     });
 

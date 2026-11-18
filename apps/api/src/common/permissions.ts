@@ -25,6 +25,13 @@ export const Permission = {
   NoteWrite: "note:write",
   AnalyticsView: "analytics:view",
   AiUse: "ai:use",
+  InterviewView: "interview:view",
+  InterviewSchedule: "interview:schedule",
+  InterviewConduct: "interview:conduct",
+  QuestionManage: "question:manage",
+  EmailSend: "email:send",
+  EmailTemplateManage: "email:template:manage",
+  AutomationManage: "automation:manage",
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
@@ -45,6 +52,11 @@ const recruiterSet: Permission[] = [
   Permission.NoteWrite,
   Permission.AnalyticsView,
   Permission.AiUse,
+  Permission.InterviewView,
+  Permission.InterviewSchedule,
+  Permission.InterviewConduct,
+  Permission.QuestionManage,
+  Permission.EmailSend,
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
@@ -56,6 +68,8 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     Permission.PipelineConfigure,
     Permission.CandidateDelete,
     Permission.AuditView,
+    Permission.EmailTemplateManage,
+    Permission.AutomationManage,
   ]),
   RECRUITER: new Set(recruiterSet),
   HIRING_MANAGER: new Set([
@@ -67,10 +81,27 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     Permission.MatchReview,
     Permission.NoteWrite,
     Permission.AnalyticsView,
+    Permission.InterviewView,
+    Permission.InterviewSchedule,
+    Permission.InterviewConduct,
   ]),
-  INTERVIEWER: new Set([Permission.JobView, Permission.CandidateView, Permission.NoteWrite]),
-  EVALUATOR: new Set([Permission.JobView, Permission.CandidateView, Permission.NoteWrite]),
-  VIEWER: new Set([Permission.JobView, Permission.CandidateView, Permission.AnalyticsView]),
+  // Interviewers and evaluators see only what they need to run their session and
+  // record feedback: no contact details, no pipeline control, no candidate-facing email.
+  INTERVIEWER: new Set([
+    Permission.JobView,
+    Permission.CandidateView,
+    Permission.NoteWrite,
+    Permission.InterviewView,
+    Permission.InterviewConduct,
+  ]),
+  EVALUATOR: new Set([
+    Permission.JobView,
+    Permission.CandidateView,
+    Permission.NoteWrite,
+    Permission.InterviewView,
+    Permission.InterviewConduct,
+  ]),
+  VIEWER: new Set([Permission.JobView, Permission.CandidateView, Permission.AnalyticsView, Permission.InterviewView]),
 };
 
 export function can(role: Role, permission: Permission): boolean {

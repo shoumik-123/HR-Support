@@ -4,6 +4,7 @@ import { RequestContext } from "../common/context";
 import { newToken, slugify } from "../common/crypto";
 import { assignableRoles } from "../common/permissions";
 import { paginate } from "../common/validation";
+import { CommunicationsService } from "../communications/communications.service";
 import { config } from "../config";
 import { MembershipStatus, Role, StageKind } from "../generated/prisma/enums";
 import { MailService } from "../mail/mail.service";
@@ -29,6 +30,7 @@ export class OrgsService {
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
     private readonly mail: MailService,
+    private readonly comms: CommunicationsService,
   ) {}
 
   // ── Organization ──
@@ -50,6 +52,7 @@ export class OrgsService {
       const org = await tx.organization.create({ data: { name, slug } });
       await tx.membership.create({ data: { userId: ctx.userId, organizationId: org.id, role: "OWNER" } });
       await createDefaultStages(tx, org.id);
+      await this.comms.ensureDefaults(org.id, tx);
       return org;
     });
     await this.activity.log({ orgId: org.id, actorId: ctx.userId, action: "org.created", entityType: "organization", entityId: org.id });
