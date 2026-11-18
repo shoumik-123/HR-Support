@@ -24,6 +24,15 @@ export const config = {
   aiModel: process.env.AI_MODEL ?? "claude-opus-5-5",
   smtpUrl: process.env.SMTP_URL || undefined,
   mailFrom: process.env.MAIL_FROM ?? "Veyra Talent <no-reply@veyra.local>",
+  // WhatsApp (Meta Cloud API). Platform-wide rather than per organization: these are bearer
+  // credentials and nothing here encrypts data at rest yet. Absent, WhatsApp still works —
+  // every message is recorded with exactly what would have been sent, as email does without SMTP.
+  whatsappToken: process.env.WHATSAPP_TOKEN || undefined,
+  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || undefined,
+  whatsappBusinessNumber: process.env.WHATSAPP_BUSINESS_NUMBER || undefined,
+  whatsappApiVersion: process.env.WHATSAPP_API_VERSION ?? "v21.0",
+  whatsappAppSecret: process.env.WHATSAPP_APP_SECRET || undefined,
+  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || undefined,
   isProduction: process.env.NODE_ENV === "production",
   runWorker: process.env.RUN_WORKER !== "false",
 };

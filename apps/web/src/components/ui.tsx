@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Icon } from "./icons";
 
 export function Spinner({ label }: { label?: string }) {
   return (
@@ -16,9 +17,9 @@ export function Spinner({ label }: { label?: string }) {
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold sm:text-2xl">{title}</h1>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b pb-4" style={{ borderColor: "var(--border)" }}>
+      <div className="min-w-0">
+        <h1 className="text-[1.35rem] font-semibold leading-tight tracking-tight sm:text-2xl">{title}</h1>
         {subtitle && (
           <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
             {subtitle}
@@ -31,14 +32,9 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 }
 
 export function Alert({ kind = "error", children }: { kind?: "error" | "info" | "success" | "warning"; children: React.ReactNode }) {
-  const styles = {
-    error: "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200",
-    warning: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
-    success: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200",
-    info: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-200",
-  }[kind];
+  const cls = { error: "alert-error", warning: "alert-warning", success: "alert-success", info: "alert-info" }[kind];
   return (
-    <div className={`rounded-lg border px-3.5 py-2.5 text-sm ${styles}`} role={kind === "error" ? "alert" : "status"}>
+    <div className={`alert ${cls}`} role={kind === "error" ? "alert" : "status"}>
       {children}
     </div>
   );
@@ -63,16 +59,9 @@ export function ScoreBadge({ score, size = "md" }: { score: number | null | unde
   if (score == null) {
     return <span className="chip" style={{ color: "var(--text-muted)" }}>Not scored</span>;
   }
-  const tone =
-    score >= 80
-      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200"
-      : score >= 60
-        ? "bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-200"
-        : score >= 40
-          ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-          : "bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-200";
+  const tone = score >= 80 ? "badge-ok" : score >= 60 ? "badge-brand" : score >= 40 ? "badge-warn" : "badge-bad";
   const dims = { sm: "px-2 py-0.5 text-xs", md: "px-2.5 py-1 text-sm", lg: "px-3 py-1.5 text-base" }[size];
-  return <span className={`inline-flex items-center rounded-full font-semibold tabular-nums ${tone} ${dims}`}>{score}</span>;
+  return <span className={`badge ${tone} rounded-full font-semibold tabular-nums ${dims}`}>{score}</span>;
 }
 
 export function ConfidenceBar({ value }: { value: number }) {
@@ -80,7 +69,7 @@ export function ConfidenceBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: "var(--surface-sunken)" }}>
-        <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--primary)" }} />
       </div>
       <span className="text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
         {pct}% confidence
@@ -103,12 +92,12 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
-      <div className={`card w-full ${wide ? "max-w-4xl" : "max-w-lg"} my-auto`} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--border)" }}>
-          <h2 className="font-semibold">{title}</h2>
-          <button className="btn-ghost px-2 py-1" onClick={onClose} aria-label="Close">
-            ✕
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-8" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`card animate-pop w-full ${wide ? "max-w-4xl" : "max-w-lg"} my-auto`} style={{ boxShadow: "var(--shadow-float)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="card-head">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <button className="btn-ghost btn-icon btn-sm" onClick={onClose} aria-label="Close">
+            <Icon name="close" size={16} />
           </button>
         </div>
         <div className="px-5 py-4">{children}</div>
@@ -145,7 +134,7 @@ export function TagInput({ value, onChange, placeholder }: { value: string[]; on
         <span key={tag} className="chip">
           {tag}
           <button type="button" onClick={() => onChange(value.filter((t) => t !== tag))} aria-label={`Remove ${tag}`} className="opacity-60 hover:opacity-100">
-            ✕
+            <Icon name="close" size={12} />
           </button>
         </span>
       ))}

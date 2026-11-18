@@ -10,7 +10,10 @@ import { config } from "./config";
 async function bootstrap() {
   await mkdir(config.storageDir, { recursive: true });
 
-  const app = await NestFactory.create(AppModule, { bodyParser: true });
+  // rawBody keeps the exact bytes of each request alongside the parsed body. The WhatsApp
+  // webhook needs them: Meta signs the bytes it sent, and re-serialising the parsed JSON
+  // would change key order or spacing and break the signature.
+  const app = await NestFactory.create(AppModule, { bodyParser: true, rawBody: true });
   app.setGlobalPrefix("api");
   app.use(helmet({ crossOriginResourcePolicy: { policy: "same-site" } }));
   app.use(cookieParser());

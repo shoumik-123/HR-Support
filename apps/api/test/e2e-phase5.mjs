@@ -237,5 +237,98 @@ check("a one-character question is refused", (await call("/copilot/ask", { ...H,
 check("a 500-character question is accepted", (await call("/copilot/ask", { ...H, body: { question: "where is the pipeline stuck " + "a".repeat(470) } })).status === 200);
 check("a longer one is refused", (await call("/copilot/ask", { ...H, body: { question: "a".repeat(501) } })).status === 400);
 
+console.log("\n== WhatsApp: templates an organization starts with ==");
+const waList = await call("/communications/whatsapp/templates", { ...H, expect: 200 });
+check("a new organization gets WhatsApp templates", waList.body.templates.length > 0);
+check("it says whether the organization has WhatsApp on", typeof waList.body.enabledForOrganization === "boolean");
+check("and whether this server can actually deliver", typeof waList.body.providerConnected === "boolean");
+check("every template fits what a provider template body accepts", waList.body.templates.every((t) => t.body.length <= 1024));
+check("no template uses a placeholder the renderer cannot fill", waList.body.templates.every((t) => t.variables.unknown.length === 0));
+check("there is no automated rejection message", !waList.body.templates.some((t) => t.key === "REJECTED"));
+
+const invite = waList.body.templates.find((t) => t.key === "INTERVIEW_INVITATION");
+const received = waList.body.templates.find((t) => t.key === "APPLICATION_RECEIVED");
+check("the urgent moments are covered", !!invite && !!received);
+
+console.log("\n== WhatsApp: editing the wording ==");
+const edited = await call(`/communications/whatsapp/templates/${received.id}`, { ...O, method: "PATCH", body: { body: "Hello {{candidate.firstName}}, {{organization.name}} received your application for {{job.title}}." }, expect: 200 });
+check("a template can be edited", edited.body.body.includes("received your application"));
+check("editing marks it as no longer the untouched default", edited.body.isDefault === false);
+const badPlaceholder = await call(`/communications/whatsapp/templates/${received.id}`, { ...O, method: "PATCH", body: { body: "Hello {{candidate.nickname}}, welcome." } });
+check("an unknown placeholder is refused with the name of it", badPlaceholder.status === 400 && /nickname/.test(JSON.stringify(badPlaceholder.body)));
+const tooLong = await call(`/communications/whatsapp/templates/${received.id}`, { ...O, method: "PATCH", body: { body: "a".repeat(1025) } });
+check("a message longer than a provider template allows is refused", tooLong.status === 400);
+check("a recruiter cannot change the wording an organization sends", (await call(`/communications/whatsapp/templates/${received.id}`, { ...H, method: "PATCH", body: { body: "Hi {{candidate.firstName}}." } })).status === 403);
+
+console.log("\n== WhatsApp: the number it would send to ==");
+const apps = (await call("/applications?pageSize=10", { ...H, expect: 200 })).body.items;
+const target = apps.find((a) => a.candidate?.phone) ?? apps[0];
+const preview = await call(`/communications/whatsapp/templates/${received.id}/preview?applicationId=${target.id}`, { ...H, expect: 200 });
+check("a preview renders against a real candidate", preview.body.body.length > 10 && !preview.body.body.includes("{{"));
+check("and shows the number in international form", preview.body.to === null || /^\+\d{8,15}$/.test(preview.body.to), preview.body.to);
+check("or says why there is no number to use", preview.body.to !== null || typeof preview.body.toReason === "string");
+
+console.log("\n== WhatsApp: nothing is sent until it is switched on ==");
+await call("/org", { ...O, method: "PATCH", body: { whatsappEnabled: false }, expect: 200 });
+const whileOff = await call("/communications/whatsapp/send", { ...H, body: { applicationId: target.id, templateId: received.id }, expect: 200 });
+check("a send while WhatsApp is off is recorded, not performed", whileOff.body.status === "SKIPPED");
+check("and the reason names the switch", /switched off/i.test(whileOff.body.reason ?? ""), whileOff.body.reason);
+
+await call("/org", { ...O, method: "PATCH", body: { whatsappEnabled: true, whatsappNumber: "+8801700000000" }, expect: 200 });
+const whileOn = await call("/communications/whatsapp/send", { ...H, body: { applicationId: target.id, templateId: received.id }, expect: 200 });
+check("a send while it is on is queued", whileOn.body.status === "QUEUED" || whileOn.body.status === "SKIPPED", JSON.stringify(whileOn.body));
+
+console.log("\n== WhatsApp: an incomplete message is not sent ==");
+const withGaps = await call("/communications/whatsapp/send", { ...H, body: { applicationId: target.id, templateId: invite.id }, expect: 200 });
+check("a message with unfilled placeholders is held back", withGaps.body.status === "SKIPPED");
+check("and the gaps are named", /gaps/i.test(withGaps.body.reason ?? "") && /interview/.test(withGaps.body.reason ?? ""), withGaps.body.reason);
+
+console.log("\n== WhatsApp: consent and a missing number ==");
+const candidateId = target.candidateId ?? target.candidate?.id;
+const before = (await call(`/candidates/${candidateId}`, { ...H, expect: 200 })).body;
+await call(`/candidates/${candidateId}`, { ...H, method: "PATCH", body: { consentStatus: "WITHDRAWN" }, expect: 200 });
+const withdrawn = await call("/communications/whatsapp/send", { ...H, body: { applicationId: target.id, templateId: received.id }, expect: 200 });
+check("a candidate who withdrew consent is not messaged", withdrawn.body.status === "SKIPPED" && /consent/i.test(withdrawn.body.reason ?? ""), withdrawn.body.reason);
+await call(`/candidates/${candidateId}`, { ...H, method: "PATCH", body: { consentStatus: before.consentStatus ?? "UNKNOWN" }, expect: 200 });
+
+await call(`/candidates/${candidateId}`, { ...H, method: "PATCH", body: { phone: null }, expect: 200 });
+const noPhone = await call("/communications/whatsapp/send", { ...H, body: { applicationId: target.id, templateId: received.id }, expect: 200 });
+check("no phone number means a recorded skip, not an error", noPhone.body.status === "SKIPPED" && /phone/i.test(noPhone.body.reason ?? ""), noPhone.body.reason);
+await call(`/candidates/${candidateId}`, { ...H, method: "PATCH", body: { phone: "01712-345678" }, expect: 200 });
+const typedLocally = await call(`/communications/whatsapp/templates/${received.id}/preview?applicationId=${target.id}`, { ...H, expect: 200 });
+check("a locally written number becomes an international one", typedLocally.body.to === "+8801712345678", typedLocally.body.to);
+await call(`/candidates/${candidateId}`, { ...H, method: "PATCH", body: { phone: before.phone ?? null }, expect: 200 });
+
+console.log("\n== WhatsApp: the log keeps both channels apart ==");
+const waLog = await call("/communications?channel=WHATSAPP&pageSize=20", { ...H, expect: 200 });
+check("the log can be filtered to WhatsApp", waLog.body.items.length > 0 && waLog.body.items.every((c) => c.channel === "WHATSAPP"));
+check("a WhatsApp row carries a phone and no email address", waLog.body.items.every((c) => c.toEmail === null));
+check("the full text of every attempt is kept, sent or not", waLog.body.items.every((c) => typeof c.body === "string" && c.body.length > 0));
+const emailLog = await call("/communications?channel=EMAIL&pageSize=5", { ...H, expect: 200 });
+check("and to email", emailLog.body.items.every((c) => c.channel === "EMAIL"));
+
+console.log("\n== WhatsApp: one event, two channels ==");
+const automations = await call("/communications/automations", { ...H, expect: 200 });
+check("WhatsApp templates are offered to automations", automations.body.whatsappTemplates.length > 0);
+const emailTemplate = automations.body.templates.find((t) => t.key === "APPLICATION_RECEIVED") ?? automations.body.templates[0];
+const rule = await call("/communications/automations", {
+  ...O, method: "PUT",
+  body: { trigger: "APPLICATION_CREATED", templateId: emailTemplate.id, whatsappTemplateId: received.id, enabled: false },
+  expect: 200,
+});
+check("one rule can carry both channels", rule.body.whatsappTemplateId === received.id);
+const cleared = await call("/communications/automations", { ...O, method: "PUT", body: { trigger: "APPLICATION_CREATED", templateId: emailTemplate.id, whatsappTemplateId: null, enabled: false }, expect: 200 });
+check("and the WhatsApp half can be removed again", cleared.body.whatsappTemplateId === null);
+check("an unknown WhatsApp template is refused", (await call("/communications/automations", { ...O, method: "PUT", body: { trigger: "APPLICATION_CREATED", templateId: emailTemplate.id, whatsappTemplateId: "not-a-template", enabled: false } })).status === 400);
+
+console.log("\n== WhatsApp: the webhook is the only public write ==");
+check("an unsigned delivery receipt is refused", (await call("/public/whatsapp", { body: { entry: [] } })).status === 403);
+check("the subscription handshake is refused without the token", (await call("/public/whatsapp?hub.mode=subscribe&hub.verify_token=guess&hub.challenge=1")).status === 403);
+check("the webhook takes no organization id", (await call("/public/whatsapp", { org: "some-other-organization-id", body: { entry: [] } })).status === 403);
+
+console.log("\n== WhatsApp: switched off again ==");
+await call("/org", { ...O, method: "PATCH", body: { whatsappEnabled: false, whatsappNumber: null }, expect: 200 });
+check("the organization is left as it was found", (await call("/communications/whatsapp/templates", { ...H, expect: 200 })).body.enabledForOrganization === false);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

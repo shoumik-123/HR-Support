@@ -47,6 +47,8 @@ import { ResumesController } from "./resumes/resumes.controller";
 import { ResumesService } from "./resumes/resumes.service";
 import { StorageModule } from "./storage/storage.service";
 import { TalentController } from "./talent/talent.controller";
+import { WhatsAppModule } from "./whatsapp/whatsapp.service";
+import { WhatsAppWebhookController } from "./whatsapp/whatsapp-webhook.controller";
 import { TalentService } from "./talent/talent.service";
 
 @Module({
@@ -55,6 +57,7 @@ import { TalentService } from "./talent/talent.service";
     ActivityModule,
     StorageModule,
     MailModule,
+    WhatsAppModule,
     QueueModule,
     AiModule,
     JwtModule.register({ global: true, secret: config.jwtSecret, signOptions: { expiresIn: config.accessTokenTtl as `${number}${"s" | "m" | "h" | "d"}` } }),
@@ -82,6 +85,7 @@ import { TalentService } from "./talent/talent.service";
     OnboardingController,
     PublicOfferController,
     PublicCareersController,
+    WhatsAppWebhookController,
     TalentController,
     CopilotController,
     DashboardController,

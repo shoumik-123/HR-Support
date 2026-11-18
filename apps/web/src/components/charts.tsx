@@ -20,13 +20,13 @@ export function StatTile({
   tone?: "default" | "attention";
 }) {
   return (
-    <div className="card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-        {label}
+    <div className="card card-hover p-4">
+      <p className="eyebrow">{label}</p>
+      <p className="mt-2 text-[1.6rem] font-semibold leading-none tabular-nums" style={tone === "attention" ? { color: "var(--accent)" } : undefined}>
+        {value}
       </p>
-      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${tone === "attention" ? "text-amber-600 dark:text-amber-400" : ""}`}>{value}</p>
       {sub && (
-        <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
+        <p className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
           {sub}
         </p>
       )}

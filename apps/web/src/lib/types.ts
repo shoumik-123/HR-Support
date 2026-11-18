@@ -495,7 +495,8 @@ export type AutomationTrigger =
   | "APPLICATION_CREATED" | "STAGE_CHANGED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED"
   | "INTERVIEW_CANCELLED" | "INTERVIEW_REMINDER" | "APPLICATION_REJECTED" | "CANDIDATE_HIRED";
 
-export type CommunicationStatus = "QUEUED" | "SENT" | "FAILED" | "SKIPPED";
+/** DELIVERED and READ only ever appear on a WhatsApp message, from a provider receipt. */
+export type CommunicationStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "SKIPPED";
 
 export interface EmailTemplate {
   id: string;
@@ -513,9 +514,12 @@ export interface AutomationRule {
   trigger: AutomationTrigger;
   stageId: string | null;
   templateId: string;
+  /** Set when this trigger also sends a WhatsApp message. */
+  whatsappTemplateId: string | null;
   enabled: boolean;
   offsetHours: number;
   template: { id: string; name: string; key: TemplateKey };
+  whatsappTemplate: { id: string; name: string; key: TemplateKey } | null;
   stage: { id: string; name: string } | null;
 }
 
@@ -523,6 +527,8 @@ export interface AutomationsResponse {
   rules: AutomationRule[];
   templates: { id: string; name: string; key: TemplateKey }[];
   stages: { id: string; name: string; kind: StageKind }[];
+  /** A rule may also send one of these, so one event reaches both channels. */
+  whatsappTemplates: { id: string; name: string; key: TemplateKey; enabled: boolean }[];
 }
 
 export interface Communication {
@@ -532,7 +538,10 @@ export interface Communication {
   interviewId: string | null;
   templateKey: TemplateKey | null;
   trigger: AutomationTrigger | null;
-  toEmail: string;
+  channel: MessageChannel;
+  toEmail: string | null;
+  /** E.164, on a WhatsApp message. */
+  toPhone: string | null;
   subject: string;
   body: string;
   status: CommunicationStatus;
@@ -543,7 +552,33 @@ export interface Communication {
   createdAt: string;
   candidate?: { id: string; fullName: string } | null;
   template?: { name: string } | null;
+  whatsappTemplate?: { name: string } | null;
   sentByName: string | null;
+}
+
+export type MessageChannel = "EMAIL" | "WHATSAPP";
+
+export interface WhatsAppTemplate {
+  id: string;
+  key: TemplateKey;
+  name: string;
+  body: string;
+  /** The name this wording is registered under with the provider, when it is. */
+  providerTemplateName: string | null;
+  locale: string;
+  enabled: boolean;
+  isDefault: boolean;
+  length: number;
+  variables: { known: string[]; unknown: string[] };
+}
+
+export interface WhatsAppTemplatesResponse {
+  templates: WhatsAppTemplate[];
+  /** Whether this organization has switched WhatsApp on. */
+  enabledForOrganization: boolean;
+  /** False when the server has no provider credentials: messages are recorded, not delivered. */
+  providerConnected: boolean;
+  businessNumber: string | null;
 }
 
 export interface CommunicationStats {

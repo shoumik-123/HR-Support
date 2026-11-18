@@ -5,8 +5,8 @@
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
 This repository covers **Phase 1** (core recruitment and AI screening), **Phase 2**
 (interview and communication automation), **Phase 3** (assessments, offers and
-onboarding), **Phase 4** (the public careers portal) and **Phase 5** (talent-pool search and
-the recruitment copilot) of the product plan.
+onboarding), **Phase 4** (the public careers portal) and **Phase 5** (talent-pool search, the
+recruitment copilot and WhatsApp messaging) of the product plan.
 
 ```
 apps/api   NestJS + Prisma + PostgreSQL API, background worker, Claude integration
@@ -166,7 +166,28 @@ learns what their permissions hide, and in blind mode candidates appear by refer
 by name. Asked who to hire, reject or advance, it declines and says why — and gives no figures
 in place of the judgement it refused to make.
 
-Not yet built (later phases): WhatsApp integration and billing.
+**WhatsApp** (Phase 5) — the messages a candidate cannot afford to miss, on the channel they
+actually read. Not a second messaging system: the same `Communication` log, the same
+placeholders, the same append-only history as email, with a `channel` on each row, and one
+automation rule can carry both an email template and a WhatsApp template so one event reaches
+both without the two drifting apart. A phone number typed as `01712-345678`, `+88 01712 345678`,
+`8801712345678` or in Bengali numerals becomes one E.164 number, and a landline is named as a
+landline rather than silently failing. Nothing reaches a phone until someone switches WhatsApp
+on for the organization; the templates are seeded short, name the sender in the first line, and
+include no automated rejection, because a rejection on a personal phone from an employer is a
+worse way to hear it than an email opened when ready. A message is held back — recorded, with
+the reason, never silently dropped — when WhatsApp is off, the template is off, consent has been
+withdrawn, there is no usable number, or the wording still has unfilled placeholders, which is
+how an interview invitation missing its time and link is stopped before it is sent. Delivery
+receipts arrive on one signature-verified public webhook and only ever move a message forward,
+so a late receipt cannot turn a read message back into a sent one. Without `WHATSAPP_TOKEN` and
+`WHATSAPP_PHONE_NUMBER_ID` the whole feature still works: every message is recorded in full with
+"not connected on this server" as its reason, exactly as email falls back to the log without SMTP.
+Credentials are platform-wide rather than per organization, because a WhatsApp token is a bearer
+credential and nothing here encrypts data at rest yet — which has to change before this is sold
+as multi-tenant SaaS.
+
+Not yet built (later phases): billing.
 
 **Coding assessments are deliberately not included.** The PRD requires candidate code to run in
 isolated infrastructure; running untrusted code without a sandbox would be irresponsible, so the
@@ -241,14 +262,14 @@ applications, match history and stored files.
 
 ```bash
 cd apps/api
-pnpm test                # 258 unit tests
+pnpm test                # 283 unit tests
 
 # End-to-end, against a running API with seeded demo data:
 pnpm db:seed && pnpm test:e2e          # Phase 1 — 52 checks
 pnpm db:seed && pnpm test:e2e:phase2   # Phase 2 — 86 checks
 pnpm db:seed && pnpm test:e2e:phase3   # Phase 3 — 98 checks
 pnpm db:seed && pnpm test:e2e:phase4   # Phase 4 — 51 checks
-pnpm db:seed && pnpm test:e2e:phase5   # Phase 5 — 93 checks
+pnpm db:seed && pnpm test:e2e:phase5   # Phase 5 — 128 checks
 ```
 
 Unit tests cover the matching algorithm and its weighting, the AI matcher's score aggregation and
@@ -266,7 +287,11 @@ redistribution, evidence quoting, protected lines never becoming evidence, and n
 zero merely because the data is missing), and how a copilot question is routed (which of the
 fixed questions it is, the period and job title read out of it, a question it cannot answer
 being admitted rather than guessed at, a request to judge a person being recognised, and the
-rule-based answer repeating every caveat it was given).
+rule-based answer repeating every caveat it was given), and WhatsApp (every local, international
+and Bengali-numeral form of one number reading as the same number, a landline being named as one,
+a seeded template fitting what a provider accepts and naming its sender, and a delivery receipt
+being rejected unless it is signed over the exact bytes received and only ever moving a message
+forward).
 
 The end-to-end suites exercise the running API: authentication, RBAC, tenant isolation, matching and
 review, the pipeline, blind mode, uploads and validation; then templates and automation gating,
@@ -284,7 +309,11 @@ no scores at all, saved searches staying private to their author, and a name fin
 blind mode is on; and the copilot — its figures agreeing with the dashboard's and with the real
 application counts, a job it cannot find being said so rather than invented, a request to judge a
 person refused with no data in its place, an instruction hidden in a question ignored, and an
-interviewer being offered a shorter list of questions than a recruiter.
+interviewer being offered a shorter list of questions than a recruiter; and WhatsApp — nothing
+sent until the organization switches it on, a message held back with its reason when consent is
+withdrawn, when there is no usable number or when the wording still has gaps, a local number
+becoming an international one, one automation rule carrying both channels, and an unsigned
+delivery receipt refused.
 
 Run each suite against a fresh seed — the Phase 1 suite rejects an application, which leaves fewer
 active candidates than the Phase 2 suite expects.

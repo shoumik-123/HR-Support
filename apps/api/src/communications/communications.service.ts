@@ -7,10 +7,14 @@ import { AutomationTrigger, TemplateKey } from "../generated/prisma/enums";
 import { MailAttachment, MailService } from "../mail/mail.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueueService } from "../queue/queue.service";
+import { DEFAULT_WHATSAPP_TEMPLATES } from "../whatsapp/default-whatsapp-templates";
+import { normalisePhone } from "../whatsapp/phone";
+import { WhatsAppSendError, WhatsAppService } from "../whatsapp/whatsapp.service";
 import { DEFAULT_TEMPLATES } from "./default-templates";
 import { firstName, render, RenderContext, usedVariables } from "./template-render";
 
 export const SEND_EMAIL_JOB = "email.send";
+export const SEND_WHATSAPP_JOB = "whatsapp.send";
 
 export interface SendRequest {
   orgId: string;
@@ -41,6 +45,7 @@ export class CommunicationsService implements OnModuleInit {
     private readonly mail: MailService,
     private readonly queue: QueueService,
     private readonly activity: ActivityService,
+    private readonly whatsapp: WhatsAppService,
   ) {}
 
   onModuleInit() {
@@ -51,6 +56,15 @@ export class CommunicationsService implements OnModuleInit {
       await this.prisma.communication.update({
         where: { id: payload.communicationId },
         data: { status: "FAILED", error: job.lastError?.slice(0, 1000) ?? "Delivery failed" },
+      });
+    });
+    this.queue.register(SEND_WHATSAPP_JOB, async (payload: { communicationId: string }) => {
+      await this.deliverWhatsApp(payload.communicationId);
+    });
+    this.queue.register(`${SEND_WHATSAPP_JOB}:failed`, async (payload: { communicationId: string }, job) => {
+      await this.prisma.communication.update({
+        where: { id: payload.communicationId },
+        data: { status: "FAILED", error: job.lastError?.slice(0, 1000) ?? "WhatsApp delivery failed" },
       });
     });
   }
@@ -131,20 +145,33 @@ export class CommunicationsService implements OnModuleInit {
 
   async automations(ctx: RequestContext) {
     await this.ensureDefaults(ctx.orgId);
+    await this.ensureWhatsAppDefaults(ctx.orgId);
     const [rules, templates, stages] = await Promise.all([
-      this.prisma.emailAutomation.findMany({ where: { organizationId: ctx.orgId }, include: { template: { select: { id: true, name: true, key: true } }, stage: { select: { id: true, name: true } } } }),
+      this.prisma.emailAutomation.findMany({
+        where: { organizationId: ctx.orgId },
+        include: {
+          template: { select: { id: true, name: true, key: true } },
+          whatsappTemplate: { select: { id: true, name: true, key: true } },
+          stage: { select: { id: true, name: true } },
+        },
+      }),
       this.prisma.emailTemplate.findMany({ where: { organizationId: ctx.orgId }, select: { id: true, name: true, key: true } }),
       this.prisma.pipelineStage.findMany({ where: { organizationId: ctx.orgId }, orderBy: { position: "asc" }, select: { id: true, name: true, kind: true } }),
     ]);
-    return { rules, templates, stages };
+    const whatsappTemplates = await this.prisma.whatsAppTemplate.findMany({ where: { organizationId: ctx.orgId }, select: { id: true, name: true, key: true, enabled: true } });
+    return { rules, templates, stages, whatsappTemplates };
   }
 
   async upsertAutomation(
     ctx: RequestContext,
-    input: { trigger: AutomationTrigger; stageId?: string | null; templateId: string; enabled: boolean; offsetHours?: number },
+    input: { trigger: AutomationTrigger; stageId?: string | null; templateId: string; whatsappTemplateId?: string | null; enabled: boolean; offsetHours?: number },
   ) {
     const template = await this.prisma.emailTemplate.findFirst({ where: { id: input.templateId, organizationId: ctx.orgId } });
     if (!template) throw new BadRequestException("Unknown template");
+    if (input.whatsappTemplateId) {
+      const wa = await this.prisma.whatsAppTemplate.findFirst({ where: { id: input.whatsappTemplateId, organizationId: ctx.orgId } });
+      if (!wa) throw new BadRequestException("Unknown WhatsApp template");
+    }
     if (input.trigger === "STAGE_CHANGED" && !input.stageId) throw new BadRequestException("Choose which stage fires this automation");
     if (input.trigger !== "STAGE_CHANGED" && input.stageId) throw new BadRequestException("A stage can only be set for the stage-changed trigger");
     if (input.stageId) {
@@ -157,6 +184,7 @@ export class CommunicationsService implements OnModuleInit {
     // migration adds NULLS NOT DISTINCT; this keeps the application correct regardless.
     const data = {
       templateId: input.templateId,
+      whatsappTemplateId: input.whatsappTemplateId ?? null,
       enabled: input.enabled,
       offsetHours: input.offsetHours ?? 24,
       updatedById: ctx.userId,
@@ -260,6 +288,12 @@ export class CommunicationsService implements OnModuleInit {
   private async deliver(communicationId: string, attachments?: MailAttachment[]) {
     const row = await this.prisma.communication.findUnique({ where: { id: communicationId } });
     if (!row || row.status === "SENT") return;
+    // An email row without an address cannot be delivered and must not be retried forever;
+    // queueSend records a skip instead, so reaching here means the row was tampered with.
+    if (!row.toEmail) {
+      await this.prisma.communication.update({ where: { id: communicationId }, data: { status: "SKIPPED", skipReason: "No email address on the message" } });
+      return;
+    }
     await this.mail.send({ to: row.toEmail, subject: row.subject, text: row.body, attachments });
     await this.prisma.communication.update({ where: { id: communicationId }, data: { status: "SENT", sentAt: new Date(), error: null } });
   }
@@ -272,7 +306,7 @@ export class CommunicationsService implements OnModuleInit {
         include: { template: true },
       });
       if (!rule) return null;
-      return await this.queueSend({
+      const email = await this.queueSend({
         orgId: input.orgId,
         templateId: rule.templateId,
         trigger,
@@ -284,6 +318,23 @@ export class CommunicationsService implements OnModuleInit {
         automated: true,
         sentById: null,
       });
+      // One rule, two channels. A WhatsApp template attached to the rule means the same
+      // event also reaches the candidate's phone; a failure on either side is recorded on
+      // its own row and neither can stop the other.
+      if (rule.whatsappTemplateId) {
+        await this.queueWhatsApp({
+          orgId: input.orgId,
+          whatsappTemplateId: rule.whatsappTemplateId,
+          trigger,
+          candidateId: input.candidateId,
+          applicationId: input.applicationId,
+          interviewId: input.interviewId,
+          extraContext: input.extraContext,
+          automated: true,
+          sentById: null,
+        }).catch((err) => this.logger.error(`WhatsApp automation ${trigger} failed: ${err instanceof Error ? err.message : err}`));
+      }
+      return email;
     } catch (err) {
       // A failed notification must never roll back the recruitment action that caused it.
       this.logger.error(`Automation ${trigger} failed: ${err instanceof Error ? err.message : err}`);
@@ -336,18 +387,23 @@ export class CommunicationsService implements OnModuleInit {
 
   // ── History ──
 
-  async history(ctx: RequestContext, q: { page: number; pageSize: number; candidateId?: string; applicationId?: string; status?: string }) {
+  async history(ctx: RequestContext, q: { page: number; pageSize: number; candidateId?: string; applicationId?: string; status?: string; channel?: string }) {
     const where: Prisma.CommunicationWhereInput = {
       organizationId: ctx.orgId,
       ...(q.candidateId ? { candidateId: q.candidateId } : {}),
       ...(q.applicationId ? { applicationId: q.applicationId } : {}),
       ...(q.status ? { status: q.status as never } : {}),
+      ...(q.channel ? { channel: q.channel as never } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.communication.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        include: { candidate: { select: { id: true, fullName: true } }, template: { select: { name: true } } },
+        include: {
+        candidate: { select: { id: true, fullName: true } },
+        template: { select: { name: true } },
+        whatsappTemplate: { select: { name: true } },
+      },
         ...paginate(q.page, q.pageSize),
       }),
       this.prisma.communication.count({ where }),
@@ -383,11 +439,263 @@ export class CommunicationsService implements OnModuleInit {
   async retry(ctx: RequestContext, id: string) {
     const row = await this.prisma.communication.findFirst({ where: { id, organizationId: ctx.orgId } });
     if (!row) throw new NotFoundException("Message not found");
-    if (row.status === "SENT") throw new BadRequestException("This message was already delivered");
-    if (row.status === "SKIPPED") throw new BadRequestException("This message was skipped and has no content to resend");
+    if (row.status === "SENT" || row.status === "DELIVERED" || row.status === "READ") throw new BadRequestException("This message was already delivered");
+    // A WhatsApp message recorded while no provider was connected keeps its text, so once
+    // WhatsApp is set up it can be sent as written rather than retyped.
+    if (row.status === "SKIPPED" && !row.body) throw new BadRequestException("This message was skipped and has no content to resend");
+    if (row.channel === "WHATSAPP") {
+      if (!row.toPhone) throw new BadRequestException("This message has no phone number to send to");
+      if (!this.whatsapp.configured) throw new BadRequestException("WhatsApp is not connected on this server, so there is nothing to retry yet");
+      await this.prisma.communication.update({ where: { id }, data: { status: "QUEUED", error: null, skipReason: null } });
+      await this.queue.enqueue(SEND_WHATSAPP_JOB, { communicationId: id }, { orgId: ctx.orgId, idempotencyKey: `whatsapp:${id}:retry:${Date.now()}` });
+      return { queued: true };
+    }
     await this.prisma.communication.update({ where: { id }, data: { status: "QUEUED", error: null } });
     await this.queue.enqueue(SEND_EMAIL_JOB, { communicationId: id }, { orgId: ctx.orgId, idempotencyKey: `email:${id}:retry:${Date.now()}` });
     return { queued: true };
+  }
+
+  // ── WhatsApp ──
+
+  /** Seeds a new organization's WhatsApp templates the first time they are asked for. */
+  async ensureWhatsAppDefaults(orgId: string) {
+    const existing = await this.prisma.whatsAppTemplate.count({ where: { organizationId: orgId } });
+    if (existing) return;
+    await this.prisma.whatsAppTemplate.createMany({
+      data: DEFAULT_WHATSAPP_TEMPLATES.map((t) => ({ ...t, organizationId: orgId, isDefault: true })),
+    });
+  }
+
+  /** Templates, plus whether this server can actually deliver one. */
+  async whatsappTemplates(ctx: RequestContext) {
+    await this.ensureWhatsAppDefaults(ctx.orgId);
+    const [templates, org] = await Promise.all([
+      this.prisma.whatsAppTemplate.findMany({ where: { organizationId: ctx.orgId }, orderBy: [{ key: "asc" }, { name: "asc" }] }),
+      this.prisma.organization.findUniqueOrThrow({ where: { id: ctx.orgId }, select: { whatsappEnabled: true, whatsappNumber: true } }),
+    ]);
+    return {
+      templates: templates.map((t) => ({ ...t, variables: usedVariables(t.body), length: t.body.length })),
+      enabledForOrganization: org.whatsappEnabled,
+      /** False when no provider credentials are set: messages are recorded, not delivered. */
+      providerConnected: this.whatsapp.configured,
+      businessNumber: org.whatsappNumber ?? this.whatsapp.businessNumber,
+    };
+  }
+
+  async createWhatsAppTemplate(ctx: RequestContext, input: { key: TemplateKey; name: string; body: string; providerTemplateName?: string | null; locale?: string }) {
+    const { unknown } = usedVariables(input.body);
+    if (unknown.length) throw new BadRequestException(`Unknown placeholders: ${unknown.map((u) => `{{${u}}}`).join(", ")}`);
+    const created = await this.prisma.whatsAppTemplate.create({ data: { ...input, organizationId: ctx.orgId, createdById: ctx.userId } });
+    await this.activity.log({
+      orgId: ctx.orgId, actorId: ctx.userId, action: "whatsapp_template.created", entityType: "whatsAppTemplate", entityId: created.id,
+      data: { key: created.key }, ip: ctx.ip,
+    });
+    return created;
+  }
+
+  async updateWhatsAppTemplate(
+    ctx: RequestContext,
+    id: string,
+    input: { name?: string; body?: string; enabled?: boolean; providerTemplateName?: string | null; locale?: string },
+  ) {
+    const template = await this.prisma.whatsAppTemplate.findFirst({ where: { id, organizationId: ctx.orgId } });
+    if (!template) throw new NotFoundException("Template not found");
+    if (input.body) {
+      const { unknown } = usedVariables(input.body);
+      if (unknown.length) throw new BadRequestException(`Unknown placeholders: ${unknown.map((u) => `{{${u}}}`).join(", ")}`);
+    }
+    const updated = await this.prisma.whatsAppTemplate.update({ where: { id }, data: { ...input, isDefault: false } });
+    await this.activity.log({
+      orgId: ctx.orgId, actorId: ctx.userId, action: "whatsapp_template.updated", entityType: "whatsAppTemplate", entityId: id,
+      data: { key: template.key, fields: Object.keys(input) }, ip: ctx.ip,
+    });
+    return updated;
+  }
+
+  async deleteWhatsAppTemplate(ctx: RequestContext, id: string) {
+    const template = await this.prisma.whatsAppTemplate.findFirst({ where: { id, organizationId: ctx.orgId } });
+    if (!template) throw new NotFoundException("Template not found");
+    const inUse = await this.prisma.emailAutomation.count({ where: { whatsappTemplateId: id, enabled: true } });
+    if (inUse) throw new BadRequestException("This template is used by an active automation; turn that off first");
+    await this.prisma.whatsAppTemplate.delete({ where: { id } });
+    await this.activity.log({ orgId: ctx.orgId, actorId: ctx.userId, action: "whatsapp_template.deleted", entityType: "whatsAppTemplate", entityId: id, ip: ctx.ip });
+  }
+
+  /** The message as the candidate would read it, and the number it would go to. */
+  async previewWhatsApp(ctx: RequestContext, templateId: string, applicationId?: string) {
+    const template = await this.prisma.whatsAppTemplate.findFirst({ where: { id: templateId, organizationId: ctx.orgId } });
+    if (!template) throw new NotFoundException("Template not found");
+    const context = applicationId
+      ? await this.buildContext({ orgId: ctx.orgId, applicationId, sentById: ctx.userId })
+      : { ...(await this.orgContext(ctx.orgId)), "candidate.name": "Example Candidate", "candidate.firstName": "Example", "job.title": "Example Role" };
+    const body = render(template.body, context);
+    const phone = normalisePhone((context as { __phone?: string }).__phone);
+    return {
+      body: body.text,
+      length: body.text.length,
+      missing: body.missing,
+      unknown: body.unknown,
+      to: phone.e164,
+      toReason: phone.reason,
+      providerTemplateName: template.providerTemplateName,
+      providerConnected: this.whatsapp.configured,
+    };
+  }
+
+  /**
+   * Queues one WhatsApp message, writing the Communication row first so the attempt is on
+   * record either way. Everything that would stop a send - the feature being off, no usable
+   * number, withdrawn consent, a disabled template - is recorded as a skip with its reason,
+   * never as a silent nothing.
+   */
+  async queueWhatsApp(req: SendRequest & { whatsappTemplateId?: string; whatsappTemplateKey?: TemplateKey }): Promise<{
+    communicationId: string;
+    status: "QUEUED" | "SKIPPED";
+    reason?: string;
+  }> {
+    const org = await this.prisma.organization.findUniqueOrThrow({ where: { id: req.orgId }, select: { whatsappEnabled: true } });
+    const context = await this.buildContext(req);
+
+    const template = req.whatsappTemplateId
+      ? await this.prisma.whatsAppTemplate.findFirst({ where: { id: req.whatsappTemplateId, organizationId: req.orgId } })
+      : req.whatsappTemplateKey
+        ? await this.prisma.whatsAppTemplate.findFirst({ where: { organizationId: req.orgId, key: req.whatsappTemplateKey }, orderBy: { isDefault: "asc" } })
+        : null;
+    if (!template && !req.body) throw new BadRequestException("No WhatsApp template available for this message");
+
+    const label = template?.name ?? "WhatsApp message";
+    const rendered = render(template?.body ?? req.body ?? "", context);
+    const body = rendered.text;
+    const skip = (reason: string, to: string | null, text = "") => this.recordWhatsAppSkip(req, template?.id ?? null, template?.key ?? null, label, to, text, reason);
+
+    const phone = normalisePhone(context.__phone);
+
+    if (!org.whatsappEnabled) return skip("WhatsApp messaging is switched off for this organization", phone.e164, body);
+    if (template && !template.enabled) return skip("This WhatsApp template is switched off", phone.e164, body);
+    if (!phone.e164) return skip(phone.reason ?? "No usable phone number", null, body);
+    if (context.__consent === "WITHDRAWN") return skip("Candidate has withdrawn consent to be contacted", phone.e164, body);
+    // A placeholder with nothing to put in it leaves a hole mid-sentence. In an email that
+    // is untidy; on someone's phone, from an employer, it reads as careless - and the thing
+    // that is missing is usually the very detail the message exists to convey. So a message
+    // with gaps is recorded, named, and not sent: an interview invitation needs to be sent
+    // from the interview, where the time and the link exist.
+    if (rendered.missing.length) {
+      return skip(`The message still had gaps (${rendered.missing.map((m) => `{{${m}}}`).join(", ")}), so it was not sent`, phone.e164, body);
+    }
+
+    const communication = await this.prisma.communication.create({
+      data: {
+        organizationId: req.orgId,
+        candidateId: req.candidateId,
+        applicationId: req.applicationId,
+        interviewId: req.interviewId,
+        assessmentId: req.assessmentId,
+        offerId: req.offerId,
+        whatsappTemplateId: template?.id,
+        templateKey: template?.key,
+        trigger: req.trigger,
+        channel: "WHATSAPP",
+        toEmail: null,
+        toPhone: phone.e164,
+        subject: label,
+        body,
+        status: "QUEUED",
+        sentById: req.sentById ?? null,
+        automated: req.automated ?? false,
+      },
+    });
+    await this.queue.enqueue(SEND_WHATSAPP_JOB, { communicationId: communication.id }, { orgId: req.orgId, idempotencyKey: `whatsapp:${communication.id}` });
+    return { communicationId: communication.id, status: "QUEUED" };
+  }
+
+  private async recordWhatsAppSkip(
+    req: SendRequest,
+    templateId: string | null,
+    templateKey: TemplateKey | null,
+    label: string,
+    to: string | null,
+    body: string,
+    reason: string,
+  ) {
+    const row = await this.prisma.communication.create({
+      data: {
+        organizationId: req.orgId, candidateId: req.candidateId, applicationId: req.applicationId, interviewId: req.interviewId,
+        assessmentId: req.assessmentId, offerId: req.offerId,
+        whatsappTemplateId: templateId ?? undefined, templateKey: templateKey ?? undefined, trigger: req.trigger,
+        channel: "WHATSAPP", toEmail: null, toPhone: to, subject: label, body,
+        status: "SKIPPED", skipReason: reason, sentById: req.sentById ?? null, automated: req.automated ?? false,
+      },
+    });
+    this.logger.log(`WhatsApp skipped (${reason}) for candidate ${req.candidateId ?? "?"}`);
+    return { communicationId: row.id, status: "SKIPPED" as const, reason };
+  }
+
+  private async deliverWhatsApp(communicationId: string) {
+    const row = await this.prisma.communication.findUnique({
+      where: { id: communicationId },
+      include: { whatsappTemplate: { select: { providerTemplateName: true, locale: true } } },
+    });
+    if (!row || !row.toPhone || row.status === "SENT" || row.status === "DELIVERED" || row.status === "READ") return;
+
+    try {
+      const result = await this.whatsapp.send({
+        to: row.toPhone,
+        text: row.body,
+        providerTemplateName: row.whatsappTemplate?.providerTemplateName ?? null,
+        locale: row.whatsappTemplate?.locale ?? "en",
+      });
+      await this.prisma.communication.update({
+        where: { id: communicationId },
+        data: result.delivered
+          ? { status: "SENT", sentAt: new Date(), providerMessageId: result.providerMessageId, error: null, skipReason: null }
+          : // Nothing left the machine, so claiming it was sent would be a lie in the one
+            // place a recruiter goes to check whether a candidate was told.
+            { status: "SKIPPED", skipReason: "WhatsApp is not connected on this server, so this message was recorded but not delivered" },
+      });
+    } catch (err) {
+      if (err instanceof WhatsAppSendError && !err.retryable) {
+        await this.prisma.communication.update({
+          where: { id: communicationId },
+          data: { status: "FAILED", error: `${err.message}`.slice(0, 1000) },
+        });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * A delivery receipt from the provider. Statuses only ever move forward, so a receipt that
+   * arrives out of order cannot turn a read message back into a sent one.
+   */
+  async applyDeliveryReceipt(providerMessageId: string, status: "sent" | "delivered" | "read" | "failed", error?: string) {
+    const row = await this.prisma.communication.findFirst({ where: { providerMessageId }, select: { id: true, status: true } });
+    if (!row) return { matched: false };
+
+    const rank: Record<string, number> = { QUEUED: 0, SKIPPED: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4 };
+    const next = status === "failed" ? "FAILED" : status === "read" ? "READ" : status === "delivered" ? "DELIVERED" : "SENT";
+    if (rank[next] <= rank[row.status] && next !== "FAILED") return { matched: true, changed: false };
+
+    await this.prisma.communication.update({
+      where: { id: row.id },
+      data: { status: next as never, ...(status === "failed" && error ? { error: error.slice(0, 1000) } : {}), ...(next === "SENT" ? { sentAt: new Date() } : {}) },
+    });
+    return { matched: true, changed: true, status: next };
+  }
+
+  /** A recruiter sending one WhatsApp message to one candidate, by hand. */
+  async sendWhatsAppToApplication(ctx: RequestContext, input: { applicationId: string; templateId?: string; body?: string }) {
+    const app = await this.prisma.application.findFirst({ where: { id: input.applicationId, organizationId: ctx.orgId } });
+    if (!app) throw new NotFoundException("Application not found");
+    const result = await this.queueWhatsApp({
+      orgId: ctx.orgId, applicationId: app.id, candidateId: app.candidateId,
+      whatsappTemplateId: input.templateId, body: input.body, sentById: ctx.userId, automated: false,
+    });
+    await this.activity.log({
+      orgId: ctx.orgId, actorId: ctx.userId, action: "whatsapp.sent", entityType: "communication", entityId: result.communicationId,
+      candidateId: app.candidateId, applicationId: app.id, jobId: app.jobId, data: { status: result.status, reason: result.reason }, ip: ctx.ip,
+    });
+    return result;
   }
 
   // ── Context ──
@@ -405,8 +713,8 @@ export class CommunicationsService implements OnModuleInit {
   }
 
   /** Assembles every template variable available for this message. */
-  private async buildContext(req: SendRequest): Promise<RenderContext & { __consent?: string }> {
-    const context: RenderContext & { __consent?: string } = { ...(await this.orgContext(req.orgId)) };
+  private async buildContext(req: SendRequest): Promise<RenderContext & { __consent?: string; __phone?: string }> {
+    const context: RenderContext & { __consent?: string; __phone?: string } = { ...(await this.orgContext(req.orgId)) };
 
     if (req.sentById) {
       const sender = await this.prisma.user.findUnique({ where: { id: req.sentById }, select: { name: true } });
@@ -418,7 +726,7 @@ export class CommunicationsService implements OnModuleInit {
       ? await this.prisma.application.findFirst({
           where: { id: req.applicationId, organizationId: req.orgId },
           include: {
-            candidate: { select: { id: true, fullName: true, email: true, consentStatus: true } },
+            candidate: { select: { id: true, fullName: true, email: true, phone: true, consentStatus: true } },
             job: { select: { title: true, location: true, department: { select: { name: true } } } },
             stage: { select: { name: true } },
           },
@@ -427,7 +735,7 @@ export class CommunicationsService implements OnModuleInit {
 
     const candidate = application?.candidate
       ?? (req.candidateId
-        ? await this.prisma.candidate.findFirst({ where: { id: req.candidateId, organizationId: req.orgId }, select: { id: true, fullName: true, email: true, consentStatus: true } })
+        ? await this.prisma.candidate.findFirst({ where: { id: req.candidateId, organizationId: req.orgId }, select: { id: true, fullName: true, email: true, phone: true, consentStatus: true } })
         : null);
 
     if (candidate) {
@@ -435,6 +743,7 @@ export class CommunicationsService implements OnModuleInit {
       context["candidate.firstName"] = firstName(candidate.fullName);
       context["candidate.email"] = candidate.email ?? undefined;
       context.__consent = candidate.consentStatus;
+      context.__phone = candidate.phone ?? undefined;
     }
     if (application) {
       context["job.title"] = application.job.title;

@@ -1,7 +1,7 @@
 # Veyra Talent — project notes for Claude
 
 Read this instead of re-exploring the repo. Phases 1–4 are complete; phase 5 is in progress
-(talent-pool search and the copilot are done; WhatsApp and billing still to build).
+(talent-pool search, the copilot and WhatsApp are done; billing is the only one left).
 
 ## Shape
 
@@ -56,6 +56,21 @@ password — there is no admin@, hiring@ or interviewer@ account).
   question and the list, no data) and phrase the reply from `Findings` — the figures the API already
   computed. It may not produce a number. Asked to judge a person, the copilot answers with a
   refusal **and no figures**, so declining cannot leak a hint.
+- **WhatsApp is a channel on the existing `Communication` log, not a second system.** Same
+  placeholders, same append-only history, same permissions as email; `channel` tells them apart and
+  one `EmailAutomation` row can carry both templates. Every reason a message is not sent (feature
+  off, template off, consent withdrawn, no usable number, **unfilled placeholders**) is recorded as
+  a skip with its reason and the full text — never a silent nothing, and never a claim that
+  something was sent when it was not: without provider credentials the row says so.
+- **A WhatsApp message with a gap is not sent.** `render()` leaves an empty placeholder as blank
+  text; on a phone, from an employer, that reads as careless and the missing part is usually the
+  point of the message. An interview invitation therefore has to be sent from the interview.
+- **No automated WhatsApp rejection template ships.** Deliberate: a rejection on a personal phone
+  is worse than an email opened when the person is ready. CUSTOM exists for anyone who disagrees.
+- **The WhatsApp webhook is the only public route that writes tenant data.** It is safe by
+  construction: Meta's signature over the exact bytes (hence `rawBody: true` in `main.ts`), only a
+  provider message id and a status are read from it, statuses only move forward, and an unknown id
+  is accepted and ignored rather than reported, so it cannot be used as an oracle.
 - **Coding assessments are deliberately absent.** The PRD requires isolated infrastructure; running
   untrusted code in the API process would be unsafe. Do not add them without a sandbox.
 - `apps/api/.env` and `storage/` stay gitignored (real JWT secret, candidate resumes). Repo is public.
@@ -88,14 +103,22 @@ password — there is no admin@, hiring@ or interviewer@ account).
 - `/auth/me` returns the user's fields at the top level (`id`, not `user.id`) plus `organizations[]`.
 - The seed's VIEWER role holds every *view* permission, so it is not a useful stand-in for a
   low-privilege member. INTERVIEWER is (no analytics, offers or assessments).
+- RECRUITER cannot manage templates (`email:template:manage` starts at HR_MANAGER) — a test that
+  edits wording has to sign in as owner@ or hr@.
+- `Communication.toEmail` is nullable now: a WhatsApp row carries `toPhone` instead. Anything
+  reading a recipient needs `toEmail ?? toPhone`.
+- WhatsApp credentials are env-only (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+  `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`), so one deployment sends from one business
+  number. Per-tenant credentials need encryption at rest first.
 
 ## Tests
 
-`cd apps/api && pnpm test` (258 unit tests, node:test). E2E: `pnpm test:e2e`,
-`test:e2e:phase2`, `test:e2e:phase3`, `test:e2e:phase4`, `test:e2e:phase5` (380 HTTP checks total) —
+`cd apps/api && pnpm test` (283 unit tests, node:test). E2E: `pnpm test:e2e`,
+`test:e2e:phase2`, `test:e2e:phase3`, `test:e2e:phase4`, `test:e2e:phase5` (415 HTTP checks total) —
 need all three servers up, and a fresh `pnpm db:seed` before each suite. The phase 4 and phase 5
 suites need blind mode off and set it themselves; both leave it off. The phase 5 suite also moves
-the viewer account to INTERVIEWER to prove the copilot's catalogue shrinks, and moves it back.
+the viewer account to INTERVIEWER to prove the copilot's catalogue shrinks, and moves it back; it
+switches WhatsApp on and off again, and briefly withdraws one candidate's consent and restores it.
 
 ## Docs
 

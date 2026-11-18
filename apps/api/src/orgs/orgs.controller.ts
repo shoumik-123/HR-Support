@@ -22,6 +22,8 @@ const UpdateOrgSchema = z.object({
   blindModeDefault: z.boolean().optional(),
   careersEnabled: z.boolean().optional(),
   careersIntro: z.string().trim().max(2000).nullable().optional(),
+  whatsappEnabled: z.boolean().optional(),
+  whatsappNumber: z.string().trim().max(32).nullable().optional(),
 });
 const zRole = z.enum(Object.values(Role) as [Role, ...Role[]]);
 const UpdateMemberSchema = z.object({

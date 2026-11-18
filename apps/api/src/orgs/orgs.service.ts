@@ -25,6 +25,8 @@ export interface OrgProfileInput {
   /** Whether /careers/<slug> is served publicly. */
   careersEnabled?: boolean;
   careersIntro?: string | null;
+  whatsappEnabled?: boolean;
+  whatsappNumber?: string | null;
 }
 
 @Injectable()

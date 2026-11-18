@@ -74,6 +74,12 @@ model Organization {
   // Public careers portal: served at /careers/<slug> with no authentication.
   careersEnabled   Boolean  @default(true)
   careersIntro     String?
+  /// WhatsApp messaging. Off until someone turns it on, because it reaches a candidate's
+  /// personal phone. Provider credentials are platform-wide (env), not stored per org -
+  /// there is no encryption-at-rest here yet, and a WhatsApp token is a bearer credential.
+  whatsappEnabled  Boolean  @default(false)
+  /// The business number shown to staff, so they know which number a candidate will see.
+  whatsappNumber   String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -106,6 +112,7 @@ model Organization {
   offers              Offer[]
   onboardingTasks     OnboardingTask[]
   savedSearches       SavedSearch[]
+  whatsappTemplates   WhatsAppTemplate[]
 }
 
 model Membership {
@@ -867,22 +874,26 @@ enum AutomationTrigger {
 
 /// Fires a template when something happens. Off by default; a human turns each one on.
 model EmailAutomation {
-  id             String            @id @default(cuid())
-  organizationId String
-  trigger        AutomationTrigger
+  id                 String            @id @default(cuid())
+  organizationId     String
+  trigger            AutomationTrigger
   /// Only for STAGE_CHANGED: which stage entry fires this.
-  stageId        String?
-  templateId     String
-  enabled        Boolean           @default(false)
+  stageId            String?
+  templateId         String
+  enabled            Boolean           @default(false)
+  /// When set, the trigger also sends this WhatsApp template - a second channel for the
+  /// same event, not a second rule, so the two can never drift apart.
+  whatsappTemplateId String?
   /// Lead time in hours for INTERVIEW_REMINDER.
-  offsetHours    Int               @default(24)
-  updatedById    String?
-  updatedAt      DateTime          @updatedAt
-  createdAt      DateTime          @default(now())
+  offsetHours        Int               @default(24)
+  updatedById        String?
+  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime          @default(now())
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  template     EmailTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  stage        PipelineStage? @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  template         EmailTemplate     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  whatsappTemplate WhatsAppTemplate? @relation(fields: [whatsappTemplateId], references: [id], onDelete: SetNull)
+  stage            PipelineStage?    @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, trigger, stageId])
 }
@@ -890,38 +901,57 @@ model EmailAutomation {
 enum CommunicationStatus {
   QUEUED
   SENT
+  /// WhatsApp only: the provider confirmed the handset received it.
+  DELIVERED
+  /// WhatsApp only: the candidate opened it.
+  READ
   FAILED
   SKIPPED
 }
 
+enum MessageChannel {
+  EMAIL
+  WHATSAPP
+}
+
 /// Every message the platform sends, with its outcome. Append-only history.
 model Communication {
-  id             String              @id @default(cuid())
-  organizationId String
-  candidateId    String?
-  applicationId  String?
-  interviewId    String?
-  templateId     String?
-  templateKey    TemplateKey?
-  trigger        AutomationTrigger?
-  toEmail        String
-  subject        String
-  body           String
-  status         CommunicationStatus @default(QUEUED)
-  error          String?
+  id                String              @id @default(cuid())
+  organizationId    String
+  candidateId       String?
+  applicationId     String?
+  interviewId       String?
+  templateId        String?
+  templateKey       TemplateKey?
+  trigger           AutomationTrigger?
+  channel           MessageChannel      @default(EMAIL)
+  /// Null on a WhatsApp message; `toPhone` carries the recipient there.
+  toEmail           String?
+  /// E.164, e.g. +8801712345678. Null on an email.
+  toPhone           String?
+  /// WhatsApp messages have no subject; the column stays for the email history.
+  subject           String
+  body              String
+  status            CommunicationStatus @default(QUEUED)
+  /// The provider's own id, so a delivery receipt can find this row again.
+  providerMessageId String?
+  error             String?
   /// Set when a send was deliberately not made (e.g. no email on file).
-  skipReason     String?
-  sentAt         DateTime?
+  skipReason        String?
+  sentAt            DateTime?
   /// Null when an automation sent it rather than a person.
-  sentById       String?
-  automated      Boolean             @default(false)
-  createdAt      DateTime            @default(now())
+  sentById          String?
+  automated         Boolean             @default(false)
+  createdAt         DateTime            @default(now())
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   candidate    Candidate?     @relation(fields: [candidateId], references: [id], onDelete: SetNull)
   application  Application?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   interview    Interview?     @relation(fields: [interviewId], references: [id], onDelete: SetNull)
   template     EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  whatsappTemplateId String?
+  whatsappTemplate   WhatsAppTemplate? @relation(fields: [whatsappTemplateId], references: [id], onDelete: SetNull)
 
   assessmentId String?
   offerId      String?
@@ -931,6 +961,7 @@ model Communication {
   @@index([organizationId, createdAt])
   @@index([candidateId, createdAt])
   @@index([applicationId])
+  @@index([providerMessageId])
 }
 
 // ═══════════════════════ Phase 3: Assessments ═══════════════════════
@@ -1291,4 +1322,33 @@ model SavedSearch {
 
   @@unique([organizationId, createdById, name])
   @@index([organizationId, createdById, updatedAt])
+}
+
+// ───────────────────────── WhatsApp ─────────────────────────
+
+/// A WhatsApp message the organization may send. Separate from EmailTemplate because the
+/// medium is different: no subject, a hard length limit, and - outside a 24-hour reply
+/// window - Meta will only deliver wording it has already approved, which is what
+/// `providerTemplateName` refers to.
+model WhatsAppTemplate {
+  id                   String      @id @default(cuid())
+  organizationId       String
+  key                  TemplateKey
+  name                 String
+  body                 String
+  /// The template name registered with the provider, when there is one. Without it a
+  /// message can only reach a candidate who wrote first, inside the 24-hour window.
+  providerTemplateName String?
+  locale               String      @default("en")
+  enabled              Boolean     @default(true)
+  isDefault            Boolean     @default(false)
+  createdById          String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  communications Communication[]
+  automations    EmailAutomation[]
+
+  @@index([organizationId, key])
 }

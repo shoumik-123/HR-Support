@@ -32,7 +32,7 @@ apps/api/                NestJS 11 — সব বিজনেস লজিক �
   src/generated/prisma   Prisma client (generated, কমিট করা হয় না)
   src/common/            guard, permission, activity log, crypto, validation
   src/<module>/          ফিচার মডিউল (নিচে তালিকা)
-  test/                  node:test, ২৫৮টা ইউনিট টেস্ট
+  test/                  node:test, ২৮৩টা ইউনিট টেস্ট
 apps/web/src/app/        Next.js App Router — এক ফোল্ডার = এক রুট
 scripts/dev-db.mjs       লোকাল Postgres
 ```
@@ -82,6 +82,7 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
 | `careers` | পাবলিক job board ও apply (auth ছাড়া) | `public-view.ts` |
 | `talent` | প্রার্থী-ভাণ্ডারে ভাষাভিত্তিক সার্চ, জমানো সার্চ | `talent-query.ts` |
 | `copilot` | নিজের ডেটা নিয়ে প্রশ্নোত্তর, সংখ্যা API-র হিসাব | `copilot-intents.ts` |
+| `whatsapp` | WhatsApp প্রোভাইডার, নম্বর স্বাভাবিকীকরণ, delivery webhook | `phone.ts` |
 | `queue` | Postgres-ভিত্তিক job queue | `queue.service.ts` |
 | `ai` | Claude API wrapper | `ai.service.ts` |
 | `dashboard` | সংখ্যা, funnel | `dashboard.service.ts` |
@@ -104,6 +105,8 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
   দিতে পারে, কোন রোলে কোনটা, আর প্রশ্ন কোনটা সেটা নিয়মে বোঝা; তালিকার বাইরে সে কিছুই করতে পারে না
 - [copilot/copilot-findings.ts](apps/api/src/copilot/copilot-findings.ts) — উত্তরের উপাদান; মডেল শুধু এই
   সংখ্যাগুলোই দেখে, তাই নতুন সংখ্যা বানানোর উপায় তার নেই
+- [whatsapp/phone.ts](apps/api/src/whatsapp/phone.ts) — যেভাবেই লেখা হোক (local/E.164/বাংলা অঙ্ক) এক নম্বর;
+  না বুঝলে কারণ ফেরায়, অনুমান করে না
 
 ---
 
@@ -207,7 +210,7 @@ pnpm test:e2e                   # Phase 1 — ৫২ HTTP চেক
 pnpm test:e2e:phase2            # ৮৬
 pnpm test:e2e:phase3            # ৯৮
 pnpm test:e2e:phase4            # ৫১
-pnpm test:e2e:phase5            # ৯৩
+pnpm test:e2e:phase5            # ১২৮
 ```
 
 e2e-র জন্য তিনটা সার্ভার চালু থাকতে হবে। প্রতিটা suite শুরুতেই নিজের আগের ডেটা পরিষ্কার করে,
