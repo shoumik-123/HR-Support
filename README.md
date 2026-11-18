@@ -26,13 +26,18 @@ cd apps/api
 cp .env.example .env                    # then set JWT_SECRET (see below)
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 pnpm db:migrate                         # create the schema
-pnpm db:seed                            # demo organization, jobs and candidates
+pnpm db:seed                            # demo data — see below
 pnpm dev                                # http://localhost:4000/api
 
 # 3. Web - in a third terminal
 cd apps/web
 pnpm dev                                # http://localhost:3000
 ```
+
+`pnpm db:seed` fills every screen so nothing looks broken on a fresh install: 3 jobs, 6 candidates
+with parsed CVs, match scores with evidence, 2 interviews (one with panel feedback), a submitted
+assessment awaiting marking, an accepted offer, and a 14-task onboarding checklist in progress.
+Without it the database is empty and every page is blank.
 
 Sign in with any seeded account (password `Veyra12345`):
 

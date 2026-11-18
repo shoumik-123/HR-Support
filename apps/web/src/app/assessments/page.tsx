@@ -51,7 +51,17 @@ function Assessments() {
 
   return (
     <>
-      <PageHeader title="Assessments" subtitle="Tests sent to candidates, and the papers waiting to be marked" />
+      <PageHeader
+        title="Assessments"
+        subtitle="Tests sent to candidates, and the papers waiting to be marked"
+        actions={
+          can("assessment:view") && (
+            <Link className="btn-secondary" href="/assessment-setup">
+              Papers & questions
+            </Link>
+          )
+        }
+      />
 
       {needsMarking > 0 && !awaiting && (
         <Alert kind="warning">

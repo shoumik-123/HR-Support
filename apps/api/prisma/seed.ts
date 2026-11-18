@@ -13,7 +13,12 @@ import type { Role } from "../src/generated/prisma/enums";
 import { DEFAULT_STAGES } from "../src/orgs/defaults";
 import { DEFAULT_TEMPLATES } from "../src/communications/default-templates";
 import { criteriaForKind } from "../src/interviews/scorecard-criteria";
-import { DEFAULT_OFFER_LETTER } from "../src/offers/defaults";
+import { DEFAULT_OFFER_LETTER, DEFAULT_ONBOARDING_TASKS } from "../src/offers/defaults";
+import { heuristicMatch } from "../src/matching/heuristic-matcher";
+import { DEFAULT_CRITERIA } from "../src/matching/criteria";
+import { toMatchProfile } from "../src/matching/matching.service";
+import { redactResumeText } from "../src/matching/redaction";
+import { createHash, randomBytes } from "node:crypto";
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 const storageDir = path.resolve(process.env.STORAGE_DIR ?? "./storage");
@@ -598,12 +603,231 @@ async function main() {
     },
   });
 
+  // ── Match scores, so the Ranking tab is not empty on a fresh install ──
+  // Scored with the rule-based matcher (no API key needed). Running "Screen candidates"
+  // in the app re-scores with AI when ANTHROPIC_API_KEY is set.
+
+  const scored = await prisma.application.findMany({
+    where: { organizationId: org.id },
+    include: {
+      job: true,
+      candidate: { include: { resumes: { where: { status: "PARSED" }, orderBy: { version: "desc" }, take: 1 } } },
+    },
+  });
+
+  for (const app of scored) {
+    const resume = app.candidate.resumes[0];
+    const parsed = (resume?.parsed ?? null) as never;
+    const profile = toMatchProfile(
+      app.candidate.skills,
+      app.candidate.totalExperienceYears,
+      app.candidate.headline,
+      parsed,
+      resume?.overallConfidence ?? 0.5,
+    );
+    const redacted = redactResumeText(resume?.rawText ?? "", [app.candidate.fullName, app.candidate.email, app.candidate.phone]);
+    const analysis = heuristicMatch(
+      {
+        title: app.job.title,
+        description: app.job.description,
+        requiredSkills: app.job.requiredSkills,
+        preferredSkills: app.job.preferredSkills,
+        minExperienceYears: app.job.minExperienceYears,
+        maxExperienceYears: app.job.maxExperienceYears,
+        educationRequirement: app.job.educationRequirement,
+      },
+      profile,
+      redacted,
+      DEFAULT_CRITERIA,
+    );
+
+    await prisma.matchResult.create({
+      data: {
+        organizationId: org.id,
+        applicationId: app.id,
+        jobId: app.jobId,
+        candidateId: app.candidateId,
+        score: analysis.score,
+        breakdown: analysis.breakdown as never,
+        matchedSkills: analysis.matchedSkills,
+        missingSkills: analysis.missingSkills,
+        strengths: analysis.strengths as never,
+        gaps: analysis.gaps as never,
+        summary: analysis.summary,
+        confidence: analysis.confidence,
+        method: "HEURISTIC",
+        promptVersion: "match-heuristic-v1",
+        criteriaSnapshot: DEFAULT_CRITERIA as never,
+        blindMode: true,
+      },
+    });
+  }
+
+  // ── A completed assessment, so the Assessments page has something to show ──
+
+  const assessmentPaper = await prisma.assessmentTemplate.findFirstOrThrow({ where: { organizationId: org.id } });
+  const paperItems = await prisma.assessmentItem.findMany({
+    where: { templateId: assessmentPaper.id },
+    orderBy: { position: "asc" },
+    include: { question: true },
+  });
+
+  const assessedApplication = scored.find((a) => a.jobId === seniorEngineer.id);
+  if (assessedApplication && paperItems.length) {
+    const totalPoints = paperItems.reduce((sum, i) => sum + (i.points ?? i.question.points), 0);
+    const takenAt = new Date(Date.now() - 4 * 86_400_000);
+    // The token is random and only its hash is stored, exactly as in the live flow.
+    const demoToken = randomBytes(32).toString("base64url");
+
+    const assessment = await prisma.assessment.create({
+      data: {
+        organizationId: org.id,
+        applicationId: assessedApplication.id,
+        candidateId: assessedApplication.candidateId,
+        jobId: assessedApplication.jobId,
+        templateId: assessmentPaper.id,
+        title: assessmentPaper.name,
+        kind: assessmentPaper.kind,
+        durationMinutes: assessmentPaper.durationMinutes,
+        passingPercent: assessmentPaper.passingPercent,
+        shuffleQuestions: assessmentPaper.shuffleQuestions,
+        showResultToCandidate: assessmentPaper.showResultToCandidate,
+        accessTokenHash: createHash("sha256").update(demoToken).digest("hex"),
+        expiresAt: new Date(Date.now() + 3 * 86_400_000),
+        startedAt: takenAt,
+        dueAt: new Date(takenAt.getTime() + assessmentPaper.durationMinutes * 60_000),
+        submittedAt: new Date(takenAt.getTime() + 31 * 60_000),
+        status: "SUBMITTED",
+        totalPoints,
+        createdById: recruiter.id,
+      },
+    });
+
+    // Answers: the closed questions already marked, the written ones waiting for a human.
+    let autoScore = 0;
+    for (const [position, item] of paperItems.entries()) {
+      const q = item.question;
+      const maxPoints = item.points ?? q.points;
+      const closed = ["MCQ_SINGLE", "MCQ_MULTI", "NUMERIC"].includes(q.type);
+      // Gets the first two closed questions right, the numeric one slightly wrong.
+      const correct = closed && q.type !== "NUMERIC";
+      const response = closed
+        ? q.type === "NUMERIC"
+          ? ["4100"]
+          : q.correctAnswers
+        : q.type === "LONG_ANSWER"
+          ? ["I would start with the error dashboard to see which endpoints and status codes are affected, then check what shipped in the last hour, then look at database latency and connection pool saturation. Errors that start exactly at a deploy are usually the deploy."]
+          : ["Authentication proves who you are. Authorisation decides what you are allowed to do once you are known."];
+      if (correct) autoScore += maxPoints;
+
+      await prisma.assessmentAnswer.create({
+        data: {
+          assessmentId: assessment.id,
+          questionId: q.id,
+          questionText: q.text,
+          questionType: q.type,
+          options: q.options,
+          position,
+          maxPoints,
+          response,
+          autoCorrect: closed ? correct : null,
+          pointsAwarded: closed ? (correct ? maxPoints : 0) : null,
+          answeredAt: new Date(takenAt.getTime() + (position + 1) * 5 * 60_000),
+        },
+      });
+    }
+    await prisma.assessment.update({ where: { id: assessment.id }, data: { autoScore, manualScore: 0 } });
+  }
+
+  // ── An accepted offer with its onboarding checklist ──
+
+  const offerApplication = scored.find((a) => a.jobId === backendEngineer.id) ?? scored[scored.length - 1];
+  if (offerApplication) {
+    const offerStart = new Date(Date.now() + 21 * 86_400_000);
+    offerStart.setHours(9, 0, 0, 0);
+
+    const offer = await prisma.offer.create({
+      data: {
+        organizationId: org.id,
+        applicationId: offerApplication.id,
+        candidateId: offerApplication.candidateId,
+        jobId: offerApplication.jobId,
+        jobTitle: offerApplication.job.title,
+        salaryAmount: 165000,
+        salaryCurrency: "BDT",
+        salaryPeriod: "MONTHLY",
+        benefits: [
+          { label: "Festival bonus", value: "2 per year" },
+          { label: "Health insurance", value: "Self and family" },
+          { label: "Annual leave", value: "20 days" },
+        ],
+        startDate: offerStart,
+        respondBy: new Date(Date.now() - 2 * 86_400_000),
+        probationMonths: 6,
+        noticePeriodDays: 60,
+        reportingTo: "Head of Engineering",
+        workLocation: "Dhaka office",
+        letterBody: DEFAULT_OFFER_LETTER.replace(/\{\{[^}]+\}\}/g, (m) =>
+          ({
+            "{{today}}": new Date().toDateString(),
+            "{{candidate.name}}": offerApplication.candidate.fullName,
+            "{{organization.name}}": org.name,
+            "{{offer.jobTitle}}": offerApplication.job.title,
+            "{{offer.salary}}": "BDT 165,000 per month",
+            "{{offer.startDate}}": offerStart.toDateString(),
+            "{{offer.respondBy}}": new Date(Date.now() - 2 * 86_400_000).toDateString(),
+            "{{sender.name}}": users[1].name,
+            "{{benefits}}": "- Festival bonus: 2 per year\n- Health insurance: Self and family\n- Annual leave: 20 days",
+            "{{probation}}": "6 months",
+            "{{notice}}": "60 days",
+            "{{reportingTo}}": "Head of Engineering",
+            "{{workLocation}}": "Dhaka office",
+          })[m] ?? ""),
+        status: "ACCEPTED",
+        sentAt: new Date(Date.now() - 6 * 86_400_000),
+        respondedAt: new Date(Date.now() - 3 * 86_400_000),
+        createdById: recruiter.id,
+        approvals: {
+          create: [
+            { approverId: users[1].id, decision: "APPROVED", decidedAt: new Date(Date.now() - 7 * 86_400_000), comment: "Within band.", position: 0 },
+            { approverId: users[3].id, decision: "APPROVED", decidedAt: new Date(Date.now() - 7 * 86_400_000), position: 1 },
+          ],
+        },
+      },
+    });
+
+    await prisma.onboardingTask.createMany({
+      data: DEFAULT_ONBOARDING_TASKS.map((t, position) => ({
+        organizationId: org.id,
+        offerId: offer.id,
+        candidateId: offerApplication.candidateId,
+        title: t.title,
+        description: t.description,
+        category: t.category,
+        position,
+        dueDate: t.daysBeforeStart != null ? new Date(offerStart.getTime() - t.daysBeforeStart * 86_400_000) : null,
+        // The first few are already done, so the board shows real progress.
+        status: position < 3 ? "DONE" : "TODO",
+        completedAt: position < 3 ? new Date() : null,
+        completedById: position < 3 ? users[1].id : null,
+        assigneeId: t.category === "IT_SETUP" ? users[2].id : users[1].id,
+      })),
+    });
+
+    await prisma.application.update({
+      where: { id: offerApplication.id },
+      data: { status: "HIRED", hiredAt: new Date(Date.now() - 3 * 86_400_000) },
+    });
+  }
+
   console.log(`\nDemo organization: ${org.name}`);
   console.log("Sign in with any of these (password: " + PASSWORD + "):");
   for (const t of TEAM) console.log(`  ${t.role.padEnd(14)} ${t.email}`);
   console.log(`\n${CANDIDATES.length} candidates, 3 jobs, ${questionSeeds.length} interview questions,`);
   console.log("2 interviews (one completed with panel feedback), 10 email templates,");
-  console.log(`${assessmentSeeds.length} assessment questions with a ready paper, and an offer letter template.`);
+  console.log(`${assessmentSeeds.length} assessment questions with a ready paper,`);
+  console.log("match scores on every application, one submitted assessment awaiting marking,");
+  console.log("and an accepted offer with its onboarding checklist in progress.");
   console.log("Run screening from a job to generate match scores.");
 }
 
