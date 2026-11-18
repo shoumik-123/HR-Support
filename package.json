@@ -4,12 +4,17 @@
   "version": "0.1.0",
   "description": "Veyra Talent - AI-powered applicant tracking & talent acquisition platform",
   "scripts": {
+    "dev": "concurrently --names db,api,web --prefix-colors magenta,cyan,green --kill-others \"pnpm db:start\" \"pnpm dev:api\" \"pnpm dev:web\"",
     "db:start": "node scripts/dev-db.mjs",
     "dev:api": "pnpm --filter @veyra/api dev",
     "dev:web": "pnpm --filter @veyra/web dev",
+    "db:seed": "pnpm --filter @veyra/api db:seed",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
   },
   "packageManager": "pnpm@12.18.0"
 }
