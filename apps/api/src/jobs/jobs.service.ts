@@ -27,6 +27,8 @@ export interface JobInput {
   salaryCurrency?: string;
   salaryVisible?: boolean;
   openings?: number;
+  /** Listed on the public careers portal while the job is published. */
+  publicApply?: boolean;
   matchingCriteria?: MatchingCriteria;
   hiringManagerIds?: string[];
   expiresAt?: Date | null;

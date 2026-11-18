@@ -22,6 +22,9 @@ export interface OrgProfileInput {
   timezone?: string;
   defaultCurrency?: string;
   blindModeDefault?: boolean;
+  /** Whether /careers/<slug> is served publicly. */
+  careersEnabled?: boolean;
+  careersIntro?: string | null;
 }
 
 @Injectable()

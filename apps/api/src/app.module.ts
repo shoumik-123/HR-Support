@@ -15,6 +15,8 @@ import { ActivityModule } from "./common/activity.service";
 import { AuthGuard } from "./common/auth.guard";
 import { AllExceptionsFilter } from "./common/http-exception.filter";
 import { CandidatesController } from "./candidates/candidates.controller";
+import { PublicCareersController } from "./careers/careers.controller";
+import { CareersService } from "./careers/careers.service";
 import { CommunicationsController } from "./communications/communications.controller";
 import { CommunicationsService } from "./communications/communications.service";
 import { CandidatesService } from "./candidates/candidates.service";
@@ -75,6 +77,7 @@ import { StorageModule } from "./storage/storage.service";
     OffersController,
     OnboardingController,
     PublicOfferController,
+    PublicCareersController,
     DashboardController,
   ],
   providers: [
@@ -94,6 +97,7 @@ import { StorageModule } from "./storage/storage.service";
     AssessmentsService,
     AssessmentBankService,
     OffersService,
+    CareersService,
     DashboardService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

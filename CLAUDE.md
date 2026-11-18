@@ -1,6 +1,6 @@
 # Veyra Talent — project notes for Claude
 
-Read this instead of re-exploring the repo. Phases 1–3 are complete and pushed.
+Read this instead of re-exploring the repo. Phases 1–4 are complete.
 
 ## Shape
 
@@ -32,6 +32,12 @@ Seed/reset: `cd apps/api && pnpm db:seed`. Login: `recruiter@veyra.test` / `Veyr
   confidence and model version. Every AI feature has a rule-based fallback (no API key needed).
 - **Anti-anchoring:** anyone who still owes interview feedback sees only their own scorecard.
 - **Offer integrity:** editing an offer resets all approvals to PENDING.
+- **The careers portal is the one place the tenant comes from the URL** (`src/careers/`), because a
+  public visitor has no membership. It stays safe by containment: reads are filtered to published,
+  `publicApply` jobs and shaped by `careers/public-view.ts`; the only write is the visitor's own
+  application. Never add an endpoint there that takes an orgId, candidateId or stageId.
+- **A hidden vacancy is a 404, not a 403** — the portal must not confirm that a draft, closed,
+  expired or unlisted job exists.
 - **Unmarked answers never score zero** — they count as `awaitingManual` and the percent stays null.
 - **Coding assessments are deliberately absent.** The PRD requires isolated infrastructure; running
   untrusted code in the API process would be unsafe. Do not add them without a sandbox.
@@ -47,11 +53,21 @@ Seed/reset: `cd apps/api && pnpm db:seed`. Login: `recruiter@veyra.test` / `Veyr
 - Action POSTs need `@HttpCode(200)`.
 - Login is rate-limited 10/min; e2e helpers retry.
 - Candidate-facing assessment payloads key on `answerId`, not `questionId`.
+- After `prisma migrate dev`, the running dev server can still hold a stale client: `dist/generated`
+  lags behind `src/generated` and you get `Unknown argument ...` at runtime while `pnpm typecheck`
+  passes. Re-run `pnpm exec tsc -p tsconfig.build.json`.
+- Publishing a job needs a description of 50+ characters, at least one required skill, and an expiry
+  that is not in the past — relevant when a test wants an expired job (publish, then backdate).
+- Anonymous requests all share one throttle bucket (`ip:`) behind the Next proxy, so a tight limit
+  on a public route locks out real users. Guard public writes by data instead: the careers portal
+  caps applications per email per hour and leans on `@@unique([jobId, candidateId])`.
 
 ## Tests
 
-`cd apps/api && pnpm test` (146 unit tests, node:test). E2E: `pnpm test:e2e`,
-`test:e2e:phase2`, `test:e2e:phase3` (236 HTTP checks total) — need all three servers up.
+`cd apps/api && pnpm test` (190 unit tests, node:test). E2E: `pnpm test:e2e`,
+`test:e2e:phase2`, `test:e2e:phase3`, `test:e2e:phase4` (287 HTTP checks total) — need all three
+servers up, and a fresh `pnpm db:seed` before each suite. The phase 4 suite needs blind mode off and
+sets it itself; it also leaves it off.
 
 ## Docs
 

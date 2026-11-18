@@ -29,6 +29,7 @@ const JobFields = {
   salaryCurrency: z.string().trim().length(3).toUpperCase(),
   salaryVisible: z.boolean(),
   openings: z.number().int().min(1).max(10_000),
+  publicApply: z.boolean(),
   matchingCriteria: MatchingCriteriaSchema,
   hiringManagerIds: z.array(z.string()).max(20),
   expiresAt: z.coerce.date().nullable(),

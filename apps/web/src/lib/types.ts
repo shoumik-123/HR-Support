@@ -3,6 +3,8 @@ export type JobStatus = "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED";
 export type StageKind = "APPLIED" | "SCREENING" | "SHORTLISTED" | "ASSESSMENT" | "INTERVIEW" | "FINAL_REVIEW" | "OFFER" | "HIRED" | "REJECTED" | "CUSTOM";
 export type ReviewStatus = "PENDING" | "ACCEPTED" | "ADJUSTED" | "DISMISSED";
 export type AnalysisMethod = "AI" | "HEURISTIC";
+export type WorkMode = "ONSITE" | "REMOTE" | "HYBRID";
+export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "TEMPORARY";
 
 export interface OrgSummary {
   id: string;
@@ -35,6 +37,8 @@ export interface Organization {
   timezone: string;
   defaultCurrency: string;
   blindModeDefault: boolean;
+  careersEnabled: boolean;
+  careersIntro: string | null;
 }
 
 export interface Member {
@@ -90,6 +94,7 @@ export interface Job {
   salaryCurrency: string;
   salaryVisible: boolean;
   openings: number;
+  publicApply: boolean;
   matchingCriteria: MatchingCriteria | null;
   hiringManagerIds: string[];
   expiresAt: string | null;
@@ -156,6 +161,8 @@ export interface ApplicationCard {
   createdAt: string;
   isReapplication: boolean;
   source: string;
+  /** Written by the candidate on the public careers page, when they applied there. */
+  coverLetter?: string | null;
   candidate: CandidateSummary;
   match: Partial<MatchResult> | null;
   effectiveScore: number | null;
@@ -760,4 +767,85 @@ export interface OnboardingBoardRow {
   daysUntilStart: number;
   tasks: OnboardingTask[];
   progress: { done: number; total: number; overdue: number };
+}
+
+// ── Public careers portal ──
+
+export interface CareersOrg {
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  brandColor: string | null;
+  website: string | null;
+  industry: string | null;
+  country: string | null;
+  intro: string | null;
+}
+
+export interface CareersSalary {
+  min: number | null;
+  max: number | null;
+  currency: string;
+}
+
+export interface CareersJobCard {
+  id: string;
+  title: string;
+  department: string | null;
+  location: string | null;
+  workMode: WorkMode;
+  employmentType: EmploymentType;
+  experience: string | null;
+  salary: CareersSalary | null;
+  requiredSkills: string[];
+  teaser: string;
+  postedAt: string;
+  closesAt: string | null;
+}
+
+export interface CareersBoard {
+  organization: CareersOrg;
+  filters: {
+    departments: string[];
+    locations: string[];
+    workModes: WorkMode[];
+    employmentTypes: EmploymentType[];
+  };
+  items: CareersJobCard[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CareersJobDetail {
+  id: string;
+  title: string;
+  department: string | null;
+  location: string | null;
+  workMode: WorkMode;
+  employmentType: EmploymentType;
+  experience: string | null;
+  salary: CareersSalary | null;
+  description: string;
+  responsibilities: string | null;
+  educationRequirement: string | null;
+  requiredSkills: string[];
+  preferredSkills: string[];
+  postedAt: string;
+  closesAt: string | null;
+}
+
+export interface CareersJobPage {
+  organization: CareersOrg;
+  job: CareersJobDetail;
+}
+
+export interface ApplicationReceipt {
+  reference: string;
+  jobTitle: string;
+  organizationName: string;
+  candidateName: string;
+  email: string;
+  isReapplication: boolean;
+  submittedAt: string;
 }

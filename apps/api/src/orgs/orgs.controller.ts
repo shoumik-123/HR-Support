@@ -20,6 +20,8 @@ const UpdateOrgSchema = z.object({
   timezone: z.string().trim().max(60).optional(),
   defaultCurrency: z.string().trim().length(3).toUpperCase().optional(),
   blindModeDefault: z.boolean().optional(),
+  careersEnabled: z.boolean().optional(),
+  careersIntro: z.string().trim().max(2000).nullable().optional(),
 });
 const zRole = z.enum(Object.values(Role) as [Role, ...Role[]]);
 const UpdateMemberSchema = z.object({

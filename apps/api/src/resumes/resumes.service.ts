@@ -177,7 +177,10 @@ export class ResumesService implements OnModuleInit {
       outcome = this.parser.parseHeuristic(extracted);
     }
 
-    const candidateId = await this.upsertCandidate(resume.organizationId, outcome.parsed, resume.uploadedById);
+    // A resume that already names its owner keeps it: the careers portal creates the
+    // candidate from what the applicant typed, which outranks whatever the parse
+    // reads off the document.
+    const candidateId = await this.upsertCandidate(resume.organizationId, outcome.parsed, resume.uploadedById, resume.candidateId);
     const priorVersions = await this.prisma.resume.count({ where: { candidateId, id: { not: resumeId } } });
 
     await this.prisma.resume.update({
@@ -215,18 +218,20 @@ export class ResumesService implements OnModuleInit {
    * Create the candidate, or merge into an existing one matched by email or phone.
    * Merging keeps the richer value for each field rather than overwriting blindly.
    */
-  private async upsertCandidate(orgId: string, parsed: ParsedResume, actorId: string | null): Promise<string> {
+  private async upsertCandidate(orgId: string, parsed: ParsedResume, actorId: string | null, pinnedCandidateId?: string | null): Promise<string> {
     const email = parsed.contact.email?.toLowerCase().trim() || null;
     const phoneKey = normalizePhone(parsed.contact.phone);
 
-    const existing = await this.prisma.candidate.findFirst({
-      where: {
-        organizationId: orgId,
-        deletedAt: null,
-        OR: [...(email ? [{ email }] : []), ...(phoneKey ? [{ phone: { contains: phoneKey } }] : [])],
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const existing = pinnedCandidateId
+      ? await this.prisma.candidate.findFirst({ where: { id: pinnedCandidateId, organizationId: orgId, deletedAt: null } })
+      : await this.prisma.candidate.findFirst({
+          where: {
+            organizationId: orgId,
+            deletedAt: null,
+            OR: [...(email ? [{ email }] : []), ...(phoneKey ? [{ phone: { contains: phoneKey } }] : [])],
+          },
+          orderBy: { createdAt: "asc" },
+        });
 
     const skills = [...new Set(parsed.skills.map((s) => canonicalSkill(s.name)))];
     const profile = {
@@ -243,7 +248,12 @@ export class ResumesService implements OnModuleInit {
       await this.prisma.candidate.update({
         where: { id: existing.id },
         data: {
-          fullName: parsed.contact.fullName && parsed.contact.fullName.length > existing.fullName.length ? parsed.contact.fullName : existing.fullName,
+          // A pinned candidate typed their own name on the apply form, so the parse
+          // never overrules it; otherwise the fuller of the two names wins.
+          fullName:
+            !pinnedCandidateId && parsed.contact.fullName && parsed.contact.fullName.length > existing.fullName.length
+              ? parsed.contact.fullName
+              : existing.fullName,
           email: existing.email ?? email,
           phone: existing.phone ?? parsed.contact.phone,
           location: existing.location ?? parsed.contact.location,

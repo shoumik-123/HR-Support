@@ -26,6 +26,7 @@ type FormState = {
   salaryMax: string;
   salaryCurrency: string;
   salaryVisible: boolean;
+  publicApply: boolean;
   openings: string;
   expiresAt: string;
   matchingCriteria: MatchingCriteria;
@@ -49,6 +50,7 @@ function initial(job?: Job): FormState {
     salaryMax: job?.salaryMax?.toString() ?? "",
     salaryCurrency: job?.salaryCurrency ?? "BDT",
     salaryVisible: job?.salaryVisible ?? false,
+    publicApply: job?.publicApply ?? true,
     openings: job?.openings?.toString() ?? "1",
     expiresAt: job?.expiresAt ? job.expiresAt.slice(0, 10) : "",
     matchingCriteria: job?.matchingCriteria ?? DEFAULT_CRITERIA,
@@ -94,6 +96,7 @@ export function JobForm({ job }: { job?: Job }) {
       salaryMax: num(form.salaryMax),
       salaryCurrency: form.salaryCurrency,
       salaryVisible: form.salaryVisible,
+      publicApply: form.publicApply,
       openings: Number(form.openings || 1),
       expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
       matchingCriteria: form.matchingCriteria,
@@ -220,6 +223,16 @@ export function JobForm({ job }: { job?: Job }) {
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.salaryVisible} onChange={(e) => set("salaryVisible", e.target.checked)} />
           Show the salary range on the public job posting
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={form.publicApply} onChange={(e) => set("publicApply", e.target.checked)} />
+          <span>
+            List on the careers page
+            <span className="mt-0.5 block" style={{ color: "var(--text-muted)" }}>
+              Applies once the job is published. Clear it for a confidential search that should stay off the public job
+              board while the pipeline runs as usual.
+            </span>
+          </span>
         </label>
       </section>
 

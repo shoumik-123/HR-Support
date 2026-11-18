@@ -4,8 +4,8 @@
 
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
 This repository covers **Phase 1** (core recruitment and AI screening), **Phase 2**
-(interview and communication automation) and **Phase 3** (assessments, offers and
-onboarding) of the product plan.
+(interview and communication automation), **Phase 3** (assessments, offers and
+onboarding) and **Phase 4** (the public careers portal) of the product plan.
 
 ```
 apps/api   NestJS + Prisma + PostgreSQL API, background worker, Claude integration
@@ -72,7 +72,7 @@ All API settings live in `apps/api/.env` (see `.env.example`):
 rule-based extractor and candidates are scored by a transparent rule-based matcher. Every result
 records which method produced it, so AI and non-AI results are never confused.
 
-## What Phase 1 includes
+## What the platform includes
 
 **Authentication & tenancy** — email/password sign-in, refresh-token rotation with reuse detection,
 email verification, password reset, session management, team invitations, eight configurable roles,
@@ -124,8 +124,17 @@ accept/decline page on its own link, withdrawal, and automatic expiry.
 documents, IT, HR, training and introductions, with due dates derived from the joining date,
 assignees and a progress board.
 
-Not yet built (later phases): the public career portal, semantic talent-pool search, the AI
-recruitment copilot, WhatsApp integration, and billing.
+**Careers portal** (Phase 4) — a public job board at `/careers/<org-slug>` that needs no account:
+filtering by department, location, work mode and employment type, one advert per vacancy, and an
+apply form that takes the applicant's own details plus a resume. Published jobs can be kept off it
+individually for a confidential search, salary appears only where the job says so, and a job that is
+a draft, closed or past its closing date is a 404 rather than a 403 — the portal never confirms that
+a hidden vacancy exists. An application lands in the Applied stage with source `CAREER_PORTAL`,
+the resume is parsed in the background like any other, and the candidate is emailed a receipt and
+shown a reference. The whole page can be switched off in Settings.
+
+Not yet built (later phases): semantic talent-pool search, the AI recruitment copilot, WhatsApp
+integration, and billing.
 
 **Coding assessments are deliberately not included.** The PRD requires candidate code to run in
 isolated infrastructure; running untrusted code without a sandbox would be irresponsible, so the
@@ -180,6 +189,13 @@ Tenant isolation is enforced in one place: the global `AuthGuard` resolves the a
 from the user's membership and puts it in the request context. Services take the organization id
 only from that context, never from a request body, and every tenant-owned query is scoped by it.
 
+The public careers portal is the one deliberate exception, because an unauthenticated visitor has no
+membership to resolve: it identifies the employer by the organization's public slug in the URL. That
+is contained rather than trusted — every read is filtered to published, public-apply jobs and shaped
+by `apps/api/src/careers/public-view.ts`, which is what the unit tests assert against, and the only
+write is an application the visitor is making about themselves. No endpoint there accepts an
+organization id, a candidate id or a pipeline stage, and an `X-Org-Id` header changes nothing.
+
 Also implemented: bcrypt password hashing, refresh tokens stored only as hashes with rotation and
 reuse detection, permission checks per route, rate limiting (stricter on authentication), Helmet
 headers, file validation by content rather than extension, macro-document rejection, ZIP-bomb
@@ -193,12 +209,13 @@ applications, match history and stored files.
 
 ```bash
 cd apps/api
-pnpm test                # 146 unit tests
+pnpm test                # 190 unit tests
 
 # End-to-end, against a running API with seeded demo data:
 pnpm db:seed && pnpm test:e2e          # Phase 1 — 52 checks
 pnpm db:seed && pnpm test:e2e:phase2   # Phase 2 — 86 checks
 pnpm db:seed && pnpm test:e2e:phase3   # Phase 3 — 98 checks
+pnpm db:seed && pnpm test:e2e:phase4   # Phase 4 — 51 checks
 ```
 
 Unit tests cover the matching algorithm and its weighting, the AI matcher's score aggregation and
@@ -207,14 +224,20 @@ estimation, the skills taxonomy, file-type detection, the role/permission matrix
 mode, scheduling arithmetic (timezone conversion across DST, overlap and conflict rules, free-slot
 search, .ics generation), scorecard weighting and panel aggregation, email template rendering, and
 assessment marking (all-or-nothing multi-select, numeric tolerance, per-candidate question shuffling,
-and withholding a result until every written answer has been marked).
+and withholding a result until every written answer has been marked), and what the careers portal is
+allowed to show (which jobs are listable, salary visibility, the listing teaser, and the absence of
+hiring data from every public shape).
 
 The end-to-end suites exercise the running API: authentication, RBAC, tenant isolation, matching and
 review, the pipeline, blind mode, uploads and validation; then templates and automation gating,
 availability and slot search, scheduling with conflict handling, question generation, scorecards and
 anti-anchoring, reschedule and cancel, and the communication log; then the assessment question-bank
 guards, a candidate sitting taken end to end over its public link, automatic and manual marking,
-offer approval gating, the candidate's accept and decline paths, and onboarding.
+offer approval gating, the candidate's accept and decline paths, and onboarding; then the public
+careers portal — browsing and filtering with no token, drafts and confidential and expired jobs
+staying invisible, salary visibility, every apply-form rejection, a complete application arriving in
+the recruiter's pipeline with its receipt and acknowledgement, re-applying, switching the portal off,
+and the fact that an `X-Org-Id` header on a public route changes nothing.
 
 Run each suite against a fresh seed — the Phase 1 suite rejects an application, which leaves fewer
 active candidates than the Phase 2 suite expects.

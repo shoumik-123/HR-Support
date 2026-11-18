@@ -79,6 +79,7 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
 | `assessments` | প্রশ্ন ব্যাংক, পেপার, মার্কিং | `scoring.ts` |
 | `offers` | offer letter, approval chain, onboarding | `offers.service.ts` |
 | `communications` | email template, automation | `template-render.ts` |
+| `careers` | পাবলিক job board ও apply (auth ছাড়া) | `public-view.ts` |
 | `queue` | Postgres-ভিত্তিক job queue | `queue.service.ts` |
 | `ai` | Claude API wrapper | `ai.service.ts` |
 | `dashboard` | সংখ্যা, funnel | `dashboard.service.ts` |
@@ -91,6 +92,8 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
 - [interviews/scheduling.ts](apps/api/src/interviews/scheduling.ts) — টাইমজোন অঙ্ক, `Intl` দিয়ে, DST-সঠিক; `buildIcs` RFC 5545
 - [interviews/scorecard-criteria.ts](apps/api/src/interviews/scorecard-criteria.ts) — weighted rating, unrated criteria-র weight পুনর্বণ্টন
 - [assessments/scoring.ts](apps/api/src/assessments/scoring.ts) — মার্কিং নিয়ম
+- [careers/public-view.ts](apps/api/src/careers/public-view.ts) — পাবলিক পেজে কোন চাকরি দেখানো যাবে আর
+  প্রতিটা response-এ কোন কোন ফিল্ড যাবে; hiring ডেটা এখানেই ছেঁকে বাদ পড়ে
 
 ---
 

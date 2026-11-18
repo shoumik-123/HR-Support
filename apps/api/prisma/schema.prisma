@@ -70,6 +70,9 @@ model Organization {
   defaultCurrency  String   @default("BDT")
   // Blind mode hides names/contact/photos from reviewers and from AI matching prompts.
   blindModeDefault Boolean  @default(false)
+  // Public careers portal: served at /careers/<slug> with no authentication.
+  careersEnabled   Boolean  @default(true)
+  careersIntro     String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -222,6 +225,8 @@ model Job {
   salaryCurrency       String         @default("BDT")
   salaryVisible        Boolean        @default(false)
   openings             Int            @default(1)
+  // Listed on the public careers portal. A published job can still be kept off it.
+  publicApply          Boolean        @default(true)
   // Weights used by candidate matching; see MatchingCriteria in matching.criteria.ts.
   matchingCriteria     Json?
   hiringManagerIds     String[]
@@ -422,6 +427,8 @@ model Application {
   hiredAt         DateTime?
   isReapplication Boolean           @default(false)
   source          CandidateSource   @default(UPLOAD)
+  /// Written by the candidate on the public careers portal; never edited by staff.
+  coverLetter     String?
   stageEnteredAt  DateTime          @default(now())
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt

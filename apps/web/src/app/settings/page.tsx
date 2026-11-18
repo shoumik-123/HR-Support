@@ -54,6 +54,7 @@ function OrgSettings() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
   const editable = can("org:manage");
 
   useEffect(() => {
@@ -78,6 +79,8 @@ function OrgSettings() {
           timezone: org.timezone,
           defaultCurrency: org.defaultCurrency,
           blindModeDefault: org.blindModeDefault,
+          careersEnabled: org.careersEnabled,
+          careersIntro: org.careersIntro || null,
         },
       });
       setSaved(true);
@@ -91,6 +94,8 @@ function OrgSettings() {
 
   if (error && !org) return <Alert>{error}</Alert>;
   if (!org) return <Spinner />;
+
+  const careersPath = `/careers/${org.slug}`;
 
   return (
     <form className="card max-w-2xl space-y-4 p-5" onSubmit={save}>
@@ -132,6 +137,57 @@ function OrgSettings() {
             </span>
           </span>
         </label>
+      </div>
+
+      <div className="rounded-lg border p-4" style={{ borderColor: "var(--border)" }}>
+        <label className="flex items-start gap-3">
+          <input type="checkbox" className="mt-1" checked={org.careersEnabled} disabled={!editable} onChange={(e) => setOrg({ ...org, careersEnabled: e.target.checked })} />
+          <span>
+            <span className="font-medium">Public careers page</span>
+            <span className="mt-0.5 block text-sm" style={{ color: "var(--text-muted)" }}>
+              Publish a job board that anyone can open and apply through, with no account. Only published jobs marked
+              &ldquo;list on the careers page&rdquo; appear there, and salary is shown only where the job says so. Switch this off and the
+              address stops resolving.
+            </span>
+          </span>
+        </label>
+
+        {org.careersEnabled && (
+          <div className="mt-4 space-y-3 border-t pt-4" style={{ borderColor: "var(--border)" }}>
+            <div>
+              <span className="label">Your careers page address</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded px-2 py-1 text-sm" style={{ background: "var(--surface-sunken)" }}>
+                  {careersPath}
+                </code>
+                <a className="btn btn-secondary text-sm" href={careersPath} target="_blank" rel="noreferrer noopener">
+                  Open
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-ghost text-sm"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(new URL(careersPath, window.location.origin).toString());
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                >
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              </div>
+            </div>
+            <Field label="Introduction" hint="Shown above the job list. Plain text, up to 2000 characters.">
+              <textarea
+                className="input min-h-24"
+                maxLength={2000}
+                value={org.careersIntro ?? ""}
+                disabled={!editable}
+                onChange={(e) => setOrg({ ...org, careersIntro: e.target.value })}
+                placeholder={`Why someone should want to work at ${org.name}.`}
+              />
+            </Field>
+          </div>
+        )}
       </div>
 
       {editable && (

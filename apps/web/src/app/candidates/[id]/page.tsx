@@ -277,6 +277,7 @@ function Applications({ candidate, onChange }: { candidate: Candidate360; onChan
                     <span className="chip mr-2">{app.stage.name}</span>
                     {app.status !== "ACTIVE" && <span className="chip mr-2">{app.status.toLowerCase()}</span>}
                     applied {timeAgo(app.createdAt)}
+                    {app.source === "CAREER_PORTAL" && " · via the careers page"}
                     {app.isReapplication && " · re-application"}
                   </p>
                 </div>
@@ -289,6 +290,16 @@ function Applications({ candidate, onChange }: { candidate: Candidate360; onChan
                   )}
                 </div>
               </div>
+              {app.coverLetter && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm" style={{ color: "var(--text-muted)" }}>
+                    What the candidate wrote when applying
+                  </summary>
+                  <p className="mt-2 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap" style={{ background: "var(--surface-sunken)" }}>
+                    {app.coverLetter}
+                  </p>
+                </details>
+              )}
             </li>
           );
         })}
