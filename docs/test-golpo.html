@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<title>ভেইরা ট্যালেন্ট — গল্পে গল্পে সম্পূর্ণ টেস্ট</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm 16mm; }
+
+  :root {
+    --ink: #1a1a24;
+    --ink-soft: #4a4a5c;
+    --ink-faint: #767688;
+    --accent: #5b4bd6;
+    --accent-soft: #efedfd;
+    --line: #dcdce6;
+    --ok: #0f7a52;
+    --ok-soft: #e8f6f0;
+    --warn: #8a5a00;
+    --warn-soft: #fdf4e3;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Nirmala UI", "Noto Sans Bengali", "Vrinda", sans-serif;
+    color: var(--ink);
+    font-size: 10.5pt;
+    line-height: 1.75;
+    margin: 0;
+  }
+
+  code, .mono {
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 9pt;
+    background: #f2f2f7;
+    padding: 1px 5px;
+    border-radius: 3px;
+    direction: ltr;
+    unicode-bidi: embed;
+  }
+
+  pre {
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 8.8pt;
+    background: #f7f7fb;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 9px 12px;
+    line-height: 1.55;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    direction: ltr;
+  }
+
+  /* ---------- cover ---------- */
+  .cover { height: 247mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .cover .mark { width: 46px; height: 46px; border-radius: 11px; background: var(--accent); color: #fff;
+                 font-size: 26pt; font-weight: 700; display: flex; align-items: center; justify-content: center;
+                 margin-bottom: 26px; font-family: Georgia, serif; }
+  .cover h1 { font-size: 30pt; line-height: 1.3; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .cover .sub { font-size: 13pt; color: var(--ink-soft); margin-bottom: 34px; }
+  .cover .rule { height: 3px; width: 64px; background: var(--accent); margin-bottom: 30px; }
+  .cover .meta { font-size: 10pt; color: var(--ink-faint); line-height: 2; }
+  .cover .note { margin-top: 34px; padding: 14px 16px; background: var(--accent-soft);
+                 border-radius: 6px; font-size: 10pt; color: var(--ink-soft); }
+
+  /* ---------- structure ---------- */
+  h2 { font-size: 15.5pt; margin: 0 0 4px; letter-spacing: -0.2px; }
+  h3 { font-size: 11.5pt; margin: 18px 0 6px; color: var(--ink); }
+
+  .chapter { page-break-before: always; }
+  .chapter-head { border-top: 3px solid var(--accent); padding-top: 12px; margin-bottom: 14px; }
+  .chapter-num { font-size: 8.5pt; letter-spacing: 1.6px; color: var(--accent); font-weight: 700; margin-bottom: 3px; }
+  .who { display: inline-block; font-size: 8.5pt; background: var(--accent-soft); color: var(--accent);
+         padding: 2px 9px; border-radius: 20px; margin-top: 5px; }
+
+  .story { background: #faf9ff; border-left: 3px solid var(--accent); padding: 11px 14px;
+           border-radius: 4px; margin: 12px 0 16px; color: var(--ink-soft); }
+  .story p { margin: 0 0 8px; }
+  .story p:last-child { margin-bottom: 0; }
+
+  ol.steps { margin: 6px 0 0; padding-left: 22px; }
+  ol.steps > li { margin-bottom: 7px; padding-left: 3px; }
+  ol.steps ul { margin: 5px 0 0; padding-left: 20px; }
+  ol.steps ul li { margin-bottom: 3px; color: var(--ink-soft); }
+
+  .check { background: var(--ok-soft); border: 1px solid #bfe3d4; border-radius: 5px;
+           padding: 10px 14px; margin: 12px 0; }
+  .check .title { font-weight: 700; color: var(--ok); font-size: 10pt; margin-bottom: 5px; }
+  .check ul { margin: 0; padding-left: 20px; }
+  .check li { margin-bottom: 3px; }
+
+  .why { border: 1px dashed var(--line); border-radius: 5px; padding: 9px 13px;
+         margin: 12px 0; font-size: 9.5pt; color: var(--ink-soft); }
+  .why b { color: var(--ink); }
+
+  .warn { background: var(--warn-soft); border: 1px solid #ecd9ae; border-radius: 5px;
+          padding: 10px 14px; margin: 12px 0; font-size: 9.8pt; color: var(--warn); }
+  .warn b { color: #6b4500; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 9.5pt; }
+  th { background: #f4f4f9; text-align: left; padding: 7px 9px; border-bottom: 2px solid var(--line); font-weight: 700; }
+  td { padding: 6px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.c, th.c { text-align: center; }
+
+  .box { width: 13px; height: 13px; border: 1.5px solid var(--ink-faint); border-radius: 3px; display: inline-block; }
+
+  .lead { font-size: 11pt; color: var(--ink-soft); margin-bottom: 4px; }
+  .tiny { font-size: 9pt; color: var(--ink-faint); }
+  .nobreak { page-break-inside: avoid; }
+  ul.plain { padding-left: 20px; margin: 6px 0; }
+  ul.plain li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <div class="mark">V</div>
+  <h1>গল্পে গল্পে<br>সম্পূর্ণ টেস্ট</h1>
+  <div class="sub">ভেইরা ট্যালেন্ট — একটি নিয়োগের পুরো যাত্রা, শুরু থেকে শেষ</div>
+  <div class="rule"></div>
+  <div class="meta">
+    একটি কাল্পনিক কোম্পানির একটি আসল নিয়োগ<br>
+    HR হিসেবে সব পরিচালনা, প্রার্থী হিসেবে সব পরীক্ষা<br>
+    ১৬টি অধ্যায় · ৭২টি যাচাই · আনুমানিক ৯০ মিনিট
+  </div>
+  <div class="note">
+    <b>এই নথিটা কী?</b> এটা ম্যানুয়াল নয়, একটা <b>পরীক্ষার চিত্রনাট্য</b>। গল্পটা পড়তে পড়তে
+    ধাপগুলো করে যান — শেষে আপনার সিস্টেমের প্রতিটা ফিচার একবার করে চলবে, আর প্রতিটার ফলাফল
+    আপনি নিজের চোখে মিলিয়ে দেখবেন। গল্পের প্রত্যেকটা চরিত্র আর প্রতিটা তথ্য ডেমো ডেটায় সত্যি
+    আছে, তাই কল্পনা করতে হবে না — সব ক্লিক করা যাবে।
+  </div>
+</section>
+
+<!-- ============ CH 0 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">প্রস্তুতি</div>
+    <h2>পর্দা ওঠার আগে</h2>
+  </div>
+
+  <p class="lead">গল্প শুরুর আগে মঞ্চটা তৈরি করে নিন। দুটো কমান্ড, এক মিনিট।</p>
+
+  <h3>১. সিস্টেম চালু করুন</h3>
+  <pre>cd c:\Users\user\Downloads\Project\HR_Support
+pnpm dev</pre>
+  <p>তিনটা জিনিস একসাথে ওঠে — ডেটাবেস <span class="mono">[db]</span>, সার্ভার <span class="mono">[api]</span>,
+  আর ওয়েবসাইট <span class="mono">[web]</span>। <b>এই টার্মিনালটা খোলা রাখুন</b>, বন্ধ করলে সব বন্ধ।</p>
+
+  <h3>২. ডেমো ডেটা বসান</h3>
+  <pre>pnpm db:seed</pre>
+  <p>নতুন টার্মিনালে। এটা প্রতিবার সব মুছে নতুন করে বসায় — পরীক্ষা করতে করতে গুলিয়ে ফেললে
+  যেকোনো সময় আবার চালাতে পারেন।</p>
+
+  <h3>৩. চরিত্রদের সাথে পরিচয়</h3>
+  <p>পাঁচজন মানুষ, পাঁচ রকম ক্ষমতা। সবার পাসওয়ার্ড <span class="mono">Veyra12345</span>।</p>
+
+  <table>
+    <tr><th>কে</th><th>লগইন</th><th>ভূমিকা</th><th>গল্পে যা করবে</th></tr>
+    <tr><td><b>নুসরাত জাহান</b></td><td class="mono">owner@veyra.test</td><td>Owner</td><td>কোম্পানির নিয়ম ঠিক করে</td></tr>
+    <tr><td><b>তানভীর আহমেদ</b></td><td class="mono">hr@veyra.test</td><td>HR Manager</td><td>পরীক্ষা ও অনবোর্ডিং সামলায়</td></tr>
+    <tr><td><b>সাদিয়া রহমান</b></td><td class="mono">recruiter@veyra.test</td><td>Recruiter</td><td>আমাদের নায়িকা — পুরো নিয়োগ চালায়</td></tr>
+    <tr><td><b>ইমরান হোসেন</b></td><td class="mono">manager@veyra.test</td><td>Hiring Manager</td><td>যে দলে লোক নেবে, সে</td></tr>
+    <tr><td><b>ফারহানা আক্তার</b></td><td class="mono">viewer@veyra.test</td><td>Viewer</td><td>শুধু দেখতে পারে — নিরাপত্তা পরীক্ষায় লাগবে</td></tr>
+  </table>
+
+  <p>আর প্রার্থীরা — ছয়জন, সবার CV ডেমো ডেটায় আছে:</p>
+  <table>
+    <tr><th>প্রার্থী</th><th>পরিচয়</th><th>অভিজ্ঞতা</th></tr>
+    <tr><td><b>আরিফ চৌধুরী</b></td><td>Senior Full Stack Engineer, ঢাকা</td><td>৭ বছর</td></tr>
+    <tr><td>মেহজাবিন করিম</td><td>Frontend Engineer, ঢাকা</td><td>৪ বছর</td></tr>
+    <tr><td>রাফিউল ইসলাম</td><td>Backend Engineer, চট্টগ্রাম</td><td>৬ বছর</td></tr>
+    <tr><td>সুমাইয়া হক</td><td>HR Executive, ঢাকা</td><td>৩ বছর</td></tr>
+    <tr><td>নাঈম হাসান</td><td>Junior Web Developer, ঢাকা</td><td>১ বছর</td></tr>
+    <tr><td>তাসনিম ফেরদৌস</td><td>Senior Talent Acquisition, সিলেট</td><td>৮ বছর</td></tr>
+  </table>
+
+  <h3>৪. পড়ার নিয়ম</h3>
+  <ul class="plain">
+    <li><b>গল্পের বাক্স</b> — কেন এই কাজটা হচ্ছে, সেই প্রেক্ষাপট।</li>
+    <li><b>যা করবেন</b> — হাতে-কলমে ধাপ। একটার পর একটা।</li>
+    <li><b>সবুজ বাক্স</b> — যা দেখলে বুঝবেন ঠিক আছে। এটাই আসল পরীক্ষা।</li>
+    <li><b>ছক কাটা বাক্স</b> — এই পরীক্ষাটা কী প্রমাণ করল। বাদ দিলেও চলবে, কিন্তু পড়লে সিস্টেমটা বুঝবেন।</li>
+  </ul>
+
+  <div class="warn">
+    <b>একটা অনুরোধ:</b> সবুজ বাক্সের কোনো একটা না মিললে সেখানেই থামুন আর লিখে রাখুন কোন
+    অধ্যায়, কোন ধাপ। শেষ পাতায় একটা চেকলিস্ট আছে — টিক দিতে দিতে এগোন।
+  </div>
+</section>
+
+<!-- ============ CH 1 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১</div>
+    <h2>নুসরাত নিয়ম ঠিক করেন</h2>
+    <span class="who">owner@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>সোমবার সকাল। ভেইরা টেকনোলজিসের প্রতিষ্ঠাতা নুসরাত জাহান একটা সিদ্ধান্ত নিয়েছেন —
+    এবার থেকে প্রথম বাছাইয়ে প্রার্থীর নাম, ছবি বা বিশ্ববিদ্যালয় কেউ দেখবে না। শুধু কাজ দেখবে।</p>
+    <p>"যোগ্যতা দেখে নেব," তিনি বললেন, "পরিচয় দেখে নয়।"</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><span class="mono">localhost:3000</span> খুলে <span class="mono">owner@veyra.test</span> দিয়ে ঢুকুন।</li>
+    <li>বাঁ দিকের তালিকা থেকে <b>Settings</b>।</li>
+    <li><b>Blind recruitment mode</b> চালু করুন।</li>
+    <li>একই পাতায় <b>Departments</b> আর <b>Recruitment stages</b> দেখুন — কোম্পানি নিজের মতো
+    ধাপ সাজাতে পারে।</li>
+    <li><b>Team</b>-এ যান। পাঁচজনকে দেখবেন, কার কী ভূমিকা লেখা আছে।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>ব্লাইন্ড মোড চালু হওয়ার পর সেটিংসে পরিবর্তনটা থেকে যায় — পাতা রিফ্রেশ করলেও।</li>
+      <li>Team পাতায় পাঁচজন, প্রত্যেকের ভূমিকা আলাদা।</li>
+      <li>Settings পাতায় কে কখন কী বদলেছে তার একটা তালিকা (<b>When</b> / <b>Action</b>)।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> কোম্পানির নিয়ম কোডে লেখা নেই, ডেটাবেসে আছে। আর প্রতিটা পরিবর্তন
+    অডিট লগে জমা হচ্ছে — ছয় মাস পরে কেউ জিজ্ঞেস করলে "কে এটা চালু করেছিল?" উত্তর আছে।
+  </div>
+</section>
+
+<!-- ============ CH 2 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ২</div>
+    <h2>একটা পদ খালি হলো</h2>
+    <span class="who">recruiter@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>ইমরান হোসেনের দলের একজন সিনিয়র ইঞ্জিনিয়ার চলে যাচ্ছেন। ইমরান সাদিয়াকে বললেন,
+    "একজন Senior Full Stack Engineer লাগবে। React, Node, PostgreSQL — আর অন্তত পাঁচ বছর।"</p>
+    <p>সাদিয়া সিস্টেমে বসলেন।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li>সাইন আউট করে <span class="mono">recruiter@veyra.test</span> দিয়ে ঢুকুন।</li>
+    <li><b>Jobs</b> → <b>New job</b>।</li>
+    <li>একটা নতুন পদ লিখুন। যা যা দেবেন:
+      <ul>
+        <li>পদের নাম, বিভাগ, কাজের ধরন, জায়গা</li>
+        <li><b>Required skills</b> — যেগুলো ছাড়া চলবেই না</li>
+        <li><b>Preferred skills</b> — থাকলে ভালো</li>
+        <li>অভিজ্ঞতার সর্বনিম্ন ও সর্বোচ্চ বছর</li>
+        <li>বেতনের পরিসর (BDT)</li>
+      </ul>
+    </li>
+    <li>সেভ করুন। খেয়াল করুন অবস্থা <b>DRAFT</b>।</li>
+    <li><b>Request approval</b> চাপুন।</li>
+    <li>এখন সাইন আউট করে <span class="mono">manager@veyra.test</span> দিয়ে ঢুকে
+    পদটা <b>Approve</b> করুন।</li>
+    <li>সাদিয়া হিসেবে ফিরে এসে <b>Publish</b> করুন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>অনুমোদনের আগে <b>Publish</b> করা যায় না।</li>
+      <li>সাদিয়া নিজের পদ নিজে অনুমোদন করতে পারেন না — বাটনটা তাঁর জন্য নেই।</li>
+      <li>অনুমোদনের পর অবস্থা বদলে যায়, আর প্রকাশের পর পদটা তালিকায় <b>Published</b> দেখায়।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> একজন মানুষ একা একটা পদ খুলে ফেলতে পারে না। চাওয়া আর অনুমোদন
+    দুজনের হাতে — এটাই <i>separation of duties</i>, আর এটা ভূমিকা দিয়ে নয়, <b>অনুমতি</b>
+    দিয়ে ঠিক করা। তাই নতুন ভূমিকা যোগ করলেও নিয়মটা ভাঙে না।
+  </div>
+</section>
+
+<!-- ============ CH 3 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৩</div>
+    <h2>CV-র স্তূপ</h2>
+    <span class="who">recruiter@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>তিন দিনে আটচল্লিশটা CV। সাদিয়া আগে প্রতিটা খুলে পড়তেন, নাম-ফোন-দক্ষতা হাতে টাইপ
+    করতেন। দুপুর গড়িয়ে যেত।</p>
+    <p>আজ তিনি সবগুলো একসাথে টেনে ছেড়ে দিলেন।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>Upload resumes</b>-এ যান (অথবা পদের পাতা থেকে <b>Upload resumes</b>)।</li>
+    <li>কয়েকটা PDF বা DOCX ফাইল একসাথে ছাড়ুন। হাতের কাছে না থাকলে যেকোনো PDF চলবে।</li>
+    <li>অপেক্ষা করুন। অবস্থা নিজে নিজে বদলাবে: <b>QUEUED → PARSING → PARSED</b>।</li>
+    <li><b>Candidates</b>-এ যান। নতুন নামগুলো এসেছে।</li>
+    <li>যেকোনো একজনের প্রোফাইল খুলুন। দেখুন কী কী আপনাআপনি বেরিয়েছে —
+    যোগাযোগ, অভিজ্ঞতা, শিক্ষা, দক্ষতা, মোট কত বছর।</li>
+    <li>ওই পাতাতেই <b>Download</b> চেপে আসল ফাইলটা নামান, আর <b>Export data</b> চেপে
+    তার সব তথ্য একবারে নিন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>আপলোডের পর পাতা রিফ্রেশ না করলেও অবস্থা বদলায়।</li>
+      <li>একই CV দুবার দিলে নতুন প্রার্থী তৈরি হয় না — পুরোনোটার নতুন সংস্করণ হয়।</li>
+      <li>প্রতিটা তথ্যের পাশে একটা আত্মবিশ্বাসের মাত্রা থাকে।</li>
+      <li>মোট অভিজ্ঞতা হিসাব করা, লেখা নয়।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> পড়ার কাজটা পেছনে একটা সারিতে (queue) হয়, তাই আপনার ব্রাউজার
+    আটকে থাকে না। আর <b>Export data</b> বাটনটা শুধু সুবিধা নয় — প্রার্থী চাইলে তার সব তথ্য
+    পাওয়ার অধিকার রাখেন।
+  </div>
+</section>
+
+<!-- ============ CH 4 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৪</div>
+    <h2>যন্ত্র সাজিয়ে দেয়, মানুষ বেছে নেয়</h2>
+    <span class="who">recruiter@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>এইখানেই সাদিয়ার আসল ভয় ছিল। "যন্ত্র যদি ভুল মানুষকে বাদ দিয়ে দেয়?"</p>
+    <p>সিস্টেমটা তাঁকে একটা জিনিস দেখিয়ে আশ্বস্ত করল — <b>বাদ দেওয়ার কোনো বাটনই যন্ত্রের হাতে নেই।</b>
+    সে শুধু সাজিয়ে দেয়, আর কেন সাজাল তার প্রমাণ দেখায়।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>Jobs</b> → <b>Senior Full Stack Engineer</b> খুলুন।</li>
+    <li><b>Match</b> অংশে যান। স্কোর অনুযায়ী সাজানো প্রার্থীর তালিকা।</li>
+    <li>স্কোর না থাকলে <b>Re-run all scores</b> চাপুন, কয়েক সেকেন্ড অপেক্ষা করুন।</li>
+    <li>একজনের সারি খুলুন। মন দিয়ে দেখুন:
+      <ul>
+        <li><b>Missing skills</b> — কী নেই</li>
+        <li>প্রতিটা মানদণ্ডে আলাদা স্কোর</li>
+        <li>CV থেকে তুলে আনা <b>উদ্ধৃতি</b> — কেন এই স্কোর</li>
+      </ul>
+    </li>
+    <li><b>Minimum score</b> স্লাইডারটা টেনে দেখুন তালিকা ছোট-বড় হয়।</li>
+    <li><b>Matching weights</b> খুঁজুন — কোন মানদণ্ড কত গুরুত্ব পাবে, সেটা বদলে দেখুন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>প্রতিটা স্কোরের সাথে <b>প্রমাণ</b> আছে — শুধু একটা সংখ্যা নয়।</li>
+      <li>কোথাও "প্রত্যাখ্যান করুন" জাতীয় কোনো স্বয়ংক্রিয় কাজ নেই।</li>
+      <li>ওজন বদলালে স্কোর বদলায় — অর্থাৎ হিসাবটা <b>আপনার</b> নিয়মে হচ্ছে।</li>
+      <li>ব্লাইন্ড মোড চালু থাকায় নাম-পরিচয় ছাড়াই মিলিয়ে দেখা হচ্ছে।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> দুটো আলাদা জিনিস। এক — CV থেকে নাম, ইমেইল, বয়স, লিঙ্গ, ধর্ম,
+    জাতি <b>মুছে</b> তারপর মিলিয়ে দেখা হয়। দুই — সামগ্রিক স্কোরটা AI দেয় <i>না</i>,
+    সার্ভার নিজে আপনার দেওয়া ওজন দিয়ে গড় করে। AI শুধু প্রতিটা মানদণ্ডে মত আর প্রমাণ দেয়।
+    তাই সিদ্ধান্ত সবসময় মানুষের।
+  </div>
+
+  <div class="warn">
+    <b>API key না থাকলেও চলবে।</b> <span class="mono">ANTHROPIC_API_KEY</span> না দিলে
+    নিয়মভিত্তিক হিসাব চলে — স্কোর আসে, প্রমাণও আসে। পদ্ধতির নামটা
+    (<span class="mono">HEURISTIC</span>) প্রতিটা ফলাফলের সাথে জমা থাকে।
+  </div>
+</section>
+
+<!-- ============ CH 5 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৫</div>
+    <h2>পাইপলাইনে নড়াচড়া</h2>
+    <span class="who">recruiter@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>সাদিয়া তালিকা দেখে তিনজনকে এগিয়ে নিলেন। একজনকে না বলতে হলো — ভদ্রভাবে, কারণসহ।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li>Match তালিকায় একজনের সারিতে <b>Assess</b> চাপুন — সে পরের ধাপে গেল।</li>
+    <li>আরেকজনকে <b>Interview</b> ধাপে নিন।</li>
+    <li>একজনকে <b>Reject</b> করুন। কারণ লিখতে বলবে — লিখুন।</li>
+    <li>প্রার্থীর প্রোফাইলে গিয়ে <b>Stage</b> ইতিহাস দেখুন।</li>
+    <li><b>Candidates</b> পাতায় ফিরে ছাঁকনি দিয়ে দেখুন — দক্ষতা, অভিজ্ঞতা, ধাপ।
+    <b>Must have all skills</b> চেক করে দেখুন তালিকা আরও ছোট হয়।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>প্রতিটা ধাপ পরিবর্তনের সাথে কে করল, কখন করল লেখা থাকে।</li>
+      <li>কারণ না লিখে প্রত্যাখ্যান করা যায় না।</li>
+      <li>ধাপ পেছনেও নেওয়া যায় — ভুল হলে শোধরানো যায়।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> প্রতিটা সিদ্ধান্তের একটা মালিক আছে আর একটা সময় আছে। প্রার্থী
+    ছয় মাস পরে জিজ্ঞেস করলে উত্তর দেওয়া যায় — আইনগতভাবে এটা জরুরি।
+  </div>
+</section>
+
+<!-- ============ CH 6 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৬</div>
+    <h2>সময় বের করা</h2>
+    <span class="who">recruiter@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>তিনজন ইন্টারভিউয়ার, দুজন প্রার্থী, আর সবার ক্যালেন্ডার ভর্তি। আগে এটা করতে
+    সাদিয়ার আটটা ইমেইল লাগত।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>Interviews</b>-এ যান। সপ্তাহের ছকটা দেখুন।</li>
+    <li>তীরচিহ্ন দিয়ে সামনে-পেছনে যান, <b>This week</b> দিয়ে ফিরে আসুন।</li>
+    <li><b>Only mine</b> চেক করে দেখুন শুধু আপনার ইন্টারভিউগুলো থাকে।</li>
+    <li>নতুন একটা ইন্টারভিউ বসান। প্যানেলে <b>ইমরান</b> আর <b>তানভীর</b> দুজনকেই রাখুন।</li>
+    <li>ইচ্ছে করে এমন সময় বাছুন যখন কেউ একজন ব্যস্ত — সিস্টেম সতর্ক করবে।
+    <b>Book anyway</b> দিয়ে জোর করেও বসানো যায়।</li>
+    <li>সেভ করে <b>Email the candidate</b> চাপুন।</li>
+    <li>ক্যালেন্ডার ফাইলটা (<span class="mono">.ics</span>) নামিয়ে Outlook বা Google
+    Calendar-এ খুলুন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>উপরে লেখা <b>Times shown in Asia/Dhaka</b> — সময় কোন অঞ্চলের, স্পষ্ট।</li>
+      <li>সংঘাত থাকলে আগেই সতর্ক করে, কিন্তু আটকায় না।</li>
+      <li><span class="mono">.ics</span> ফাইলটা আসল ক্যালেন্ডারে ঠিকঠাক খোলে।</li>
+      <li>বাতিল করা ইন্টারভিউ রাউন্ড নম্বর নষ্ট করে না — পরেরটা আবার "রাউন্ড ২" হয়।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> সময়ের হিসাবটা দিনের আলো-সাশ্রয় (DST) সহ ঠিকঠাক করা, কোনো
+    বাইরের লাইব্রেরি ছাড়াই। আর ইমেইল পাঠানোটা আলাদা একটা বাটন — অটোমেশন বন্ধ থাকলেও
+    আপনি নিজে পাঠাতে পারবেন। অটোমেশন শুধু <i>আপনি না থাকলে</i> কী হবে সেটা ঠিক করে।
+  </div>
+</section>
+
+<!-- ============ CH 7 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৭</div>
+    <h2>সবচেয়ে চমৎকার পরীক্ষাটা</h2>
+    <span class="who">manager@veyra.test + hr@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>ইন্টারভিউ শেষ। ইমরান নিজের মতামত লিখতে বসলেন — আর তার আগে উঁকি দিয়ে দেখতে চাইলেন
+    তানভীর কী দিয়েছেন।</p>
+    <p>দেখতে পেলেন না।</p>
+    <p>এটা বাগ নয়। এটাই নকশা।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><span class="mono">manager@veyra.test</span> দিয়ে ঢুকুন (ইমরান)।</li>
+    <li><b>Interviews</b> → সোমবারের শেষ হওয়া ইন্টারভিউটা খুলুন।</li>
+    <li>স্কোরকার্ড অংশে তাকান। <b>শুধু নিজেরটা দেখা যাচ্ছে</b>, অন্যদেরটা লুকানো।</li>
+    <li>এবার প্রতিটা মানদণ্ডে রেটিং দিন, মন্তব্য লিখুন, জমা দিন।</li>
+    <li>জমা দেওয়ার <b>সাথে সাথে</b> বাকিদের স্কোরকার্ড খুলে যাবে।</li>
+    <li>নিচে <b>consensus</b> না <b>split</b> লেখা দেখুন — প্যানেল একমত কি না।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>জমা দেওয়ার আগে অন্যের মতামত <b>কোনোভাবেই</b> দেখা যায় না।</li>
+      <li>জমা দেওয়ার পরেই সব খুলে যায়।</li>
+      <li>কোনো মানদণ্ডে রেটিং না দিলে তার ওজন বাকিগুলোয় ভাগ হয়ে যায়।</li>
+      <li>সিস্টেম <b>কখনো</b> বলে না "নিয়োগ করুন" বা "বাদ দিন" — শুধু বলে একমত না দ্বিমত।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> মানুষের মন <i>anchoring</i>-এ আটকে যায় — আগের জনের ৪ দেখলে
+    নিজের ৩ বদলে ৪ লিখে ফেলে। সেটা ঠেকাতে যার মতামত বাকি, সে কেবল নিজেরটা দেখে।
+    <b>এই নিয়মটা ভূমিকার ঊর্ধ্বে</b> — ইমরান ইন্টারভিউটা নিজে সাজিয়েছেন, তবু তিনিও দেখতে
+    পান না। একবার এই জায়গায় বাগ ছিল, ঠিক করা হয়েছে।
+  </div>
+</section>
+
+<!-- ============ CH 8 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৮</div>
+    <h2>তানভীর প্রশ্নপত্র বানান</h2>
+    <span class="who">hr@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>"ইন্টারভিউয়ে সবাই ভালো কথা বলে," তানভীর বললেন। "কে সত্যিই পারে, সেটা দেখতে হবে।"</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><span class="mono">hr@veyra.test</span> দিয়ে ঢুকুন।</li>
+    <li><b>Assessments</b> → <b>Papers &amp; questions</b>।</li>
+    <li><b>Question bank</b> ট্যাবে <b>Add question</b>। পাঁচ রকম প্রশ্ন বানিয়ে দেখুন:
+      <ul>
+        <li>এক-উত্তর বহুনির্বাচনী</li>
+        <li>একাধিক-উত্তর বহুনির্বাচনী</li>
+        <li>সংখ্যা (সহনশীলতার মাত্রা দেওয়া যায়)</li>
+        <li>ছোট উত্তর</li>
+        <li>রচনা</li>
+      </ul>
+    </li>
+    <li>বহুনির্বাচনীতে উত্তর না দাগিয়ে সেভ করতে চেষ্টা করুন — আটকে দেবে।</li>
+    <li><b>Papers</b> ট্যাবে <b>Create paper</b>। প্রশ্ন বাছুন, সময় দিন, পাস মার্ক দিন।</li>
+    <li>সেভ করে <b>Assessments</b>-এ ফিরে একজন প্রার্থীকে পাঠান।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>উত্তরপত্র ছাড়া বন্ধ প্রশ্ন সেভ হয় না।</li>
+      <li>প্রশ্নপত্রের মোট নম্বর নিজে নিজে যোগ হয়।</li>
+      <li>পাঠানোর পর অবস্থা <b>Sent</b>।</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>কোডিং পরীক্ষা ইচ্ছে করে রাখা হয়নি।</b> প্রার্থীর লেখা কোড চালাতে হলে সেটা আলাদা,
+    বিচ্ছিন্ন সার্ভারে চালানো দরকার। মূল সার্ভারে অচেনা কোড চালানো বিপজ্জনক — তাই
+    নিরাপদ ব্যবস্থা না বানানো পর্যন্ত ফিচারটা যোগ করা হয়নি। এটা অসম্পূর্ণতা নয়, সিদ্ধান্ত।
+  </div>
+</section>
+
+<!-- ============ CH 9 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ৯</div>
+    <h2>এবার আপনি প্রার্থী</h2>
+    <span class="who">কোনো অ্যাকাউন্ট লাগবে না</span>
+  </div>
+
+  <div class="story">
+    <p>আরিফ চৌধুরী অফিস থেকে ফিরে ইমেইল খুললেন। একটা লিংক। ক্লিক করলেন।</p>
+    <p>কোনো অ্যাকাউন্ট বানাতে হলো না, পাসওয়ার্ড মনে রাখতে হলো না।</p>
+  </div>
+
+  <h3>লিংকটা কোথায় পাবেন</h3>
+  <p>ইমেইল সত্যি যায় না (ডেভেলপমেন্টে), তাই লিংকটা দেখতে হবে। <b>Communications</b>
+  পাতায় পাঠানো ইমেইলটা খুলুন — ভেতরে লিংক আছে। অথবা <span class="mono">[api]</span>
+  টার্মিনালে দেখুন, পাঠানো ইমেইল সেখানে ছাপা হয়।</p>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>ছদ্মবেশী (incognito) উইন্ডোতে</b> লিংকটা খুলুন — তাহলে বোঝা যাবে সত্যিই
+    অ্যাকাউন্ট ছাড়া চলে।</li>
+    <li>পরীক্ষা শুরু করুন। উপরে ডানদিকে ঘড়ি নামতে থাকবে।</li>
+    <li>কয়েকটা উত্তর দিন, তারপর <b>জমা না দিয়েই পাতা রিফ্রেশ করুন</b>।</li>
+    <li>ফিরে এসে দেখুন উত্তরগুলো আছে কি না।</li>
+    <li>ট্যাব বন্ধ করার চেষ্টা করুন — ব্রাউজার সতর্ক করবে।</li>
+    <li>সব উত্তর দিয়ে জমা দিন।</li>
+    <li>জমা দেওয়ার পর <b>আবার সেই লিংকে ঢুকুন</b>।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>ঘড়ি সত্যিই চলে, আর শূন্য হলে নিজে নিজে জমা হয়ে যায়।</li>
+      <li>রিফ্রেশ করলেও উত্তর হারায় না — আড়ালে সেভ হচ্ছিল।</li>
+      <li>জমা দেওয়ার পর একই লিংকে আর পরীক্ষা দেওয়া যায় না।</li>
+      <li>লিংকের একটা অক্ষর বদলে দিলে কাজ করে না।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> লিংকের গোপন অংশটা ডেটাবেসে <b>হুবহু রাখা হয় না</b> — তার
+    একটা একমুখী ছাপ (hash) রাখা হয়। মানে ডেটাবেস কেউ দেখে ফেললেও কারও পরীক্ষার
+    লিংক বানাতে পারবে না। আর পাতাটা প্রার্থীর নিজের উত্তরের পরিচয় ধরে চলে, প্রশ্নের
+    পরিচয় ধরে নয় — তাই আপনি প্রশ্ন মুছে ফেললেও তার দেওয়া উত্তর নষ্ট হয় না।
+  </div>
+</section>
+
+<!-- ============ CH 10 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১০</div>
+    <h2>খাতা দেখা</h2>
+    <span class="who">hr@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>বহুনির্বাচনীগুলো নিজে নিজেই কাটা হয়ে গেছে। রচনাটা তানভীরকে পড়তে হবে।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>Assessments</b>-এ ফিরুন। <b>Only awaiting marking</b> চেক করুন।</li>
+    <li>খাতাটা খুলে <b>Mark</b> চাপুন।</li>
+    <li>দেখুন বন্ধ প্রশ্নগুলোতে আগেই নম্বর বসানো, পাশে <b>Marked by hand</b> নয়।</li>
+    <li>রচনায় নম্বর দিন, <b>Save marks</b>।</li>
+    <li>খেয়াল করুন — নম্বর দেওয়ার <b>আগে</b> শতাংশ দেখাচ্ছিল না।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>অর্ধেক দেখা খাতার শতাংশ বা পাস/ফেল দেখায় না।</li>
+      <li>সব নম্বর বসার পরেই চূড়ান্ত ফল আসে।</li>
+      <li>একাধিক-উত্তর প্রশ্নে অর্ধেক ঠিক হলে <b>শূন্য</b> — আংশিক নম্বর নেই।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> এখানে একটা বাজে বাগ ছিল। প্রশ্নের উত্তরপত্র মুছে ফেললে সেই
+    প্রশ্নটা চুপচাপ <b>শূন্য</b> পেয়ে যেত, আর খাতা দেখাত "সম্পূর্ণ"। প্রার্থী বিনা দোষে
+    ফেল করতেন। এখন নিয়ম — যে প্রশ্নে নম্বর বসেনি, সেটা <i>মানুষের অপেক্ষায়</i>, শূন্য নয়।
+  </div>
+</section>
+
+<!-- ============ CH 11 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১১</div>
+    <h2>প্রস্তাব, আর একটা শেষ মুহূর্তের বদল</h2>
+    <span class="who">recruiter@veyra.test + manager@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>আরিফ ভালো করেছেন। সাদিয়া নিয়োগপত্র বানালেন, দুজন অনুমোদন দিলেন।</p>
+    <p>তারপর ইমরান ফোন করলেন — "বেতনটা পাঁচ হাজার বাড়িয়ে দাও, ও আরেকটা অফার পেয়েছে।"</p>
+    <p>সাদিয়া বদলে দিলেন। আর তখনই মজার জিনিসটা ঘটল।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li>সাদিয়া হিসেবে <b>Offers</b> → নতুন নিয়োগপত্র বানান। বেতন, শুরুর তারিখ,
+    সুবিধা, শিক্ষানবিশকাল, নোটিশ পিরিয়ড।</li>
+    <li><b>The offer letter</b> অংশে দেখুন চিঠিটা নিজে নিজে লেখা হয়ে গেছে।</li>
+    <li>অনুমোদনের জন্য পাঠান।</li>
+    <li>ইমরান হিসেবে ঢুকে <b>Waiting for my approval</b> দেখুন, <b>Approve</b> করুন।</li>
+    <li>সাদিয়া হিসেবে ফিরে <b>বেতনটা বদলে দিন</b>।</li>
+    <li>এখন <b>Approvals</b> অংশে তাকান।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>বেতন বদলানোর সাথে সাথে <b>সব অনুমোদন বাতিল</b> হয়ে আবার অপেক্ষায় চলে যায়।</li>
+      <li>অনুমোদন ছাড়া নিয়োগপত্র পাঠানো যায় না।</li>
+      <li>আবার অনুমোদন নিয়ে <b>Send to candidate</b> করলে তবেই যায়।</li>
+      <li><b>Withdraw offer</b> দিয়ে ফেরত নেওয়া যায়।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> ইমরান যে শর্তে সই করেছিলেন, সেটা আর নেই। তাই তাঁর সই-ও আর
+    থাকে না। আগে এখানে উল্টো সমস্যা ছিল — অনুমোদিত নিয়োগপত্র <i>একদমই</i> বদলানো যেত না।
+    এখন বদলানো যায়, কিন্তু বদলালেই আবার অনুমোদন লাগে।
+  </div>
+</section>
+
+<!-- ============ CH 12 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১২</div>
+    <h2>আবার আপনি প্রার্থী</h2>
+    <span class="who">কোনো অ্যাকাউন্ট লাগবে না</span>
+  </div>
+
+  <div class="story">
+    <p>আরিফের ইনবক্সে চিঠিটা এল। পুরো শর্ত, তারিখসহ। নিচে দুটো বাটন।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li>নিয়োগপত্রের লিংকটা বের করুন (আগের মতোই — Communications অথবা
+    <span class="mono">[api]</span> টার্মিনাল)।</li>
+    <li>ছদ্মবেশী উইন্ডোতে খুলুন। পুরো চিঠিটা পড়ুন।</li>
+    <li>আগে <b>Decline this offer</b> চেপে দেখুন — কারণ চাইবে, <b>Confirm decline</b>।</li>
+    <li>এবার আবার seed চালিয়ে (<span class="mono">pnpm db:seed</span>) ফিরে এসে
+    এবার <b>Confirm your acceptance</b> চাপুন।</li>
+    <li>HR হিসেবে ঢুকে দেখুন অবস্থা বদলে <b>ACCEPTED</b>।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>প্রার্থী যা দেখেন তাতে অন্য প্রার্থীর কোনো তথ্য নেই।</li>
+      <li>উত্তর দেওয়ার পর লিংকটা আর কাজ করে না।</li>
+      <li>গ্রহণ করার সাথে সাথে HR-এর পাতায় অবস্থা বদলে যায়।</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ CH 13 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১৩</div>
+    <h2>প্রথম দিনের প্রস্তুতি</h2>
+    <span class="who">hr@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>আরিফ রাজি। এখন চৌদ্দটা কাজ — NID-র কপি, আগের অফিসের ছাড়পত্র, ল্যাপটপ, ইমেইল
+    অ্যাকাউন্ট, ব্যাংক হিসাব।</p>
+    <p>তালিকাটা নিজে নিজে তৈরি হয়ে গেল।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li>গৃহীত নিয়োগপত্রটা খুলুন। অনবোর্ডিং তালিকা দেখুন।</li>
+    <li>কাজগুলো কয়েকটা ভাগে সাজানো — কাগজপত্র, IT, পরিচিতি।</li>
+    <li>কয়েকটায় টিক দিন। কে শেষ করল, কখন করল — লেখা হয়ে যায়।</li>
+    <li>দেখুন শেষ তারিখগুলো যোগদানের তারিখ থেকে পিছিয়ে হিসাব করা।</li>
+    <li>একটা কাজ অন্য কাউকে দিন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>চৌদ্দটা কাজ আপনাআপনি তৈরি।</li>
+      <li>বাংলাদেশের বাস্তবতা মাথায় রেখে — NID, ছাড়পত্র, উৎসব বোনাস।</li>
+      <li>অগ্রগতি দেখায় (যেমন ৩/১৪)।</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ CH 14 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১৪</div>
+    <h2>চিঠিপত্রের কারখানা</h2>
+    <span class="who">hr@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>দশটা তৈরি টেমপ্লেট। সাদিয়া একটা বদলাতে গিয়ে ভুল করে <span class="mono">{{candidate.naam}}</span>
+    লিখে ফেললেন।</p>
+    <p>সেভ হলো না।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>Communications</b>-এ যান। পাঠানো ইমেইলের ইতিহাস দেখুন —
+    <b>When</b>, <b>Template</b>, <b>Sent by</b>, <b>Outcome</b>।</li>
+    <li>একটা টেমপ্লেট খুলে সম্পাদনা করুন।</li>
+    <li>ইচ্ছে করে একটা ভুল প্লেসহোল্ডার লিখুন, যেমন <span class="mono">{{candidate.naam}}</span>।
+    সেভ করতে চেষ্টা করুন।</li>
+    <li>ঠিক নামটা বসিয়ে সেভ করুন।</li>
+    <li>অটোমেশনের অংশটা দেখুন — কোন ঘটনায় কোন ইমেইল যাবে। সবগুলো <b>বন্ধ</b> অবস্থায় আছে।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>ভুল প্লেসহোল্ডার <b>সেভ করার সময়েই</b> আটকায় — পাঠানোর সময় নয়।</li>
+      <li>অটোমেশন ডিফল্টে বন্ধ।</li>
+      <li>প্রতিটা পাঠানো ইমেইলের নথি থাকে।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> ভুলটা ধরা পড়ে সেভ করার সময়, কারণ পাঠানোর সময় ধরা পড়লে
+    প্রার্থীর কাছে "প্রিয় {{candidate.naam}}" চলে যেত। আর অটোমেশন বন্ধ থাকে, কারণ
+    কারও অজান্তে প্রার্থীর কাছে ইমেইল যাওয়া উচিত নয় — চালু করাটা সচেতন সিদ্ধান্ত।
+  </div>
+</section>
+
+<!-- ============ CH 15 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১৫</div>
+    <h2>ফারহানার পরীক্ষা</h2>
+    <span class="who">viewer@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>ফারহানা আক্তার হিসাব বিভাগে কাজ করেন। তাঁকে দেখার অনুমতি দেওয়া হয়েছে, বদলানোর নয়।</p>
+    <p>এটাই সবচেয়ে জরুরি পরীক্ষা — কারণ এখানে ভুল হলে ক্ষতিটা সবচেয়ে বড়।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><span class="mono">viewer@veyra.test</span> দিয়ে ঢুকুন।</li>
+    <li>প্রতিটা পাতায় ঘুরুন। লক্ষ করুন কোন বাটনগুলো <b>নেই</b>।</li>
+    <li>ঠিকানার ঘরে সরাসরি <span class="mono">localhost:3000/jobs/new</span> টাইপ করে
+    ঢোকার চেষ্টা করুন।</li>
+    <li>এবার আরও কঠিন পরীক্ষা — ইন্টারভিউয়ের স্কোরকার্ড, নিয়োগপত্রের বেতন দেখার চেষ্টা করুন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li><b>New job</b>, <b>Reject</b>, <b>Approve</b> — কোনোটাই দেখা যায় না।</li>
+      <li>সরাসরি ঠিকানা লিখে ঢুকলেও কাজ হয় না — সার্ভার আটকায়।</li>
+      <li>সংবেদনশীল তথ্য লুকানো।</li>
+    </ul>
+  </div>
+
+  <div class="why">
+    <b>কী প্রমাণ হলো:</b> বাটন লুকানো নিরাপত্তা নয়, সেটা শুধু সৌজন্য। আসল পাহারাটা
+    সার্ভারে — প্রতিটা অনুরোধে অনুমতি মিলিয়ে দেখা হয়। আর কোম্পানির পরিচয়টা কখনো
+    অনুরোধ থেকে নেওয়া হয় না, সবসময় সদস্যপদ দেখে ঠিক করা হয়। তাই অনুরোধ জাল করে
+    অন্য কোম্পানির তথ্য দেখা যায় না।
+  </div>
+</section>
+
+<!-- ============ CH 16 ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">অধ্যায় ১৬</div>
+    <h2>মাসের শেষে</h2>
+    <span class="who">hr@veyra.test</span>
+  </div>
+
+  <div class="story">
+    <p>তানভীর ড্যাশবোর্ড খুললেন। একটা নিয়োগ শেষ — শুরু থেকে যোগদান পর্যন্ত।</p>
+  </div>
+
+  <h3>যা করবেন</h3>
+  <ol class="steps">
+    <li><b>Dashboard</b>-এ যান।</li>
+    <li>মিলিয়ে দেখুন — খোলা পদ, প্রার্থী সংখ্যা, আসন্ন ইন্টারভিউ, অপেক্ষমাণ খাতা, নিয়োগপত্র।</li>
+    <li>ফানেলটা দেখুন — কোন ধাপে কতজন, কোথায় সবচেয়ে বেশি ঝরে যাচ্ছে।</li>
+    <li>গল্পে আপনি যা যা করেছেন, সংখ্যাগুলো তার সাথে মেলে কি না দেখুন।</li>
+  </ol>
+
+  <div class="check">
+    <div class="title">✓ যা দেখবেন</div>
+    <ul>
+      <li>সংখ্যাগুলো আপনার করা কাজের সাথে মেলে।</li>
+      <li>ফানেলের প্রতিটা ধাপ ক্লিক করলে সেই তালিকায় নিয়ে যায়।</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ CHECKLIST ============ -->
+<section class="chapter">
+  <div class="chapter-head">
+    <div class="chapter-num">সারসংক্ষেপ</div>
+    <h2>চেকলিস্ট</h2>
+  </div>
+
+  <p class="lead">প্রতিটা অধ্যায় শেষে টিক দিন। সব টিক পড়লে পুরো সিস্টেম একবার করে চলেছে।</p>
+
+  <table>
+    <tr><th class="c">✓</th><th>অধ্যায়</th><th>মূল যাচাই</th></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১ · নিয়ম</td><td>ব্লাইন্ড মোড টেকে, অডিট লগ লেখা হয়</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>২ · পদ</td><td>অনুমোদন ছাড়া প্রকাশ হয় না, নিজে নিজেরটা অনুমোদন করা যায় না</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৩ · CV</td><td>পেছনে পার্সিং, একই CV-তে নতুন সংস্করণ</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৪ · ম্যাচিং</td><td>প্রমাণসহ স্কোর, ওজন বদলালে স্কোর বদলায়, স্বয়ংক্রিয় বাদ নেই</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৫ · পাইপলাইন</td><td>কারণ ছাড়া প্রত্যাখ্যান নয়, সব পরিবর্তনের মালিক আছে</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৬ · ইন্টারভিউ</td><td>সংঘাতে সতর্ক, <span class="mono">.ics</span> খোলে, বাতিল রাউন্ড খায় না</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৭ · স্কোরকার্ড</td><td><b>জমা দেওয়ার আগে অন্যের মত দেখা যায় না</b></td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৮ · প্রশ্নপত্র</td><td>উত্তরপত্র ছাড়া বন্ধ প্রশ্ন সেভ হয় না</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>৯ · পরীক্ষা দেওয়া</td><td>ঘড়ি, স্বয়ংক্রিয় সেভ, একবারই দেওয়া যায়</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১০ · খাতা দেখা</td><td><b>অসম্পূর্ণ খাতার শতাংশ দেখায় না</b></td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১১ · নিয়োগপত্র</td><td><b>বদলালে সব অনুমোদন বাতিল</b></td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১২ · গ্রহণ</td><td>অ্যাকাউন্ট ছাড়া চলে, একবারই উত্তর</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১৩ · অনবোর্ডিং</td><td>১৪ কাজ, তারিখ হিসাব করা</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১৪ · ইমেইল</td><td>ভুল প্লেসহোল্ডার সেভেই আটকায়, অটোমেশন বন্ধ</td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১৫ · নিরাপত্তা</td><td><b>সরাসরি ঠিকানা লিখেও ঢোকা যায় না</b></td></tr>
+    <tr><td class="c"><span class="box"></span></td><td>১৬ · ড্যাশবোর্ড</td><td>সংখ্যা মেলে</td></tr>
+  </table>
+
+  <h3>আটকে গেলে</h3>
+  <table>
+    <tr><th>যা দেখছেন</th><th>কারণ</th><th>সমাধান</th></tr>
+    <tr><td>Internal server error</td><td>ডেটাবেস চলছে না</td><td><span class="mono">pnpm dev</span> — তিনটাই একসাথে চালু হয়েছে কি না দেখুন</td></tr>
+    <tr><td>পাতা ফাঁকা</td><td>ডেটা নেই</td><td><span class="mono">pnpm db:seed</span></td></tr>
+    <tr><td>Too Many Requests</td><td>খুব দ্রুত অনেক ক্লিক</td><td>এক মিনিট অপেক্ষা</td></tr>
+    <tr><td>EADDRINUSE</td><td>আগের সার্ভার বন্ধ হয়নি</td><td><span class="mono">Get-NetTCPConnection -LocalPort 3000 -State Listen</span> দিয়ে খুঁজে বন্ধ করুন</td></tr>
+    <tr><td>ইমেইল আসছে না</td><td>আসল ইমেইল পাঠানো হয় না</td><td>Communications পাতায় অথবা <span class="mono">[api]</span> টার্মিনালে দেখুন</td></tr>
+    <tr><td>স্কোর নেই</td><td>পেছনের কাজ শেষ হয়নি</td><td>কয়েক সেকেন্ড পর <span class="mono">Re-run all scores</span></td></tr>
+  </table>
+
+  <h3>শেষ কথা</h3>
+  <p>এই গল্পটা একবার শেষ করলে আপনি সিস্টেমের প্রতিটা অংশ ব্যবহার করেছেন — HR হিসেবেও,
+  প্রার্থী হিসেবেও। নতুন কিছু যোগ করার পর আবার একবার চালিয়ে দেখলে বুঝবেন পুরোনো কিছু
+  ভাঙল কি না।</p>
+  <p class="tiny">কোডের ভেতরটা বুঝতে চাইলে <span class="mono">ARCHITECTURE.bn.md</span>,
+  দৈনন্দিন ব্যবহারের জন্য <span class="mono">README.bn.md</span>।</p>
+</section>
+
+</body>
+</html>
