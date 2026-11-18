@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { throttleTracker, type TrackedRequest } from "./common/throttle-tracker";
 import { AiModule } from "./ai/ai.service";
 import { ApplicationsController } from "./applications/applications.controller";
 import { ApplicationsService } from "./applications/applications.service";
@@ -51,7 +52,10 @@ import { StorageModule } from "./storage/storage.service";
     QueueModule,
     AiModule,
     JwtModule.register({ global: true, secret: config.jwtSecret, signOptions: { expiresIn: config.accessTokenTtl as `${number}${"s" | "m" | "h" | "d"}` } }),
-    ThrottlerModule.forRoot({ throttlers: [{ name: "default", limit: 300, ttl: 60_000 }] }),
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: "default", limit: 300, ttl: 60_000 }],
+      getTracker: (req) => throttleTracker(req as TrackedRequest, config.jwtSecret),
+    }),
   ],
   controllers: [
     HealthController,
