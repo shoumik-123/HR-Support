@@ -49,9 +49,11 @@ model User {
   sessions    Session[]
   tokens      UserToken[]
 
-  interviewSlots InterviewParticipant[]
-  scorecards     Scorecard[]
-  availability   InterviewerAvailability[]
+  interviewSlots  InterviewParticipant[]
+  scorecards      Scorecard[]
+  availability    InterviewerAvailability[]
+  offerApprovals  OfferApproval[]
+  onboardingTasks OnboardingTask[]
 }
 
 model Organization {
@@ -85,14 +87,20 @@ model Organization {
   batches      UploadBatch[]
   aiUsage      AiUsage[]
 
-  questions          InterviewQuestion[]
-  interviewTemplates InterviewTemplate[]
-  interviews         Interview[]
-  scorecards         Scorecard[]
-  availability       InterviewerAvailability[]
-  emailTemplates     EmailTemplate[]
-  emailAutomations   EmailAutomation[]
-  communications     Communication[]
+  questions           InterviewQuestion[]
+  interviewTemplates  InterviewTemplate[]
+  interviews          Interview[]
+  scorecards          Scorecard[]
+  availability        InterviewerAvailability[]
+  emailTemplates      EmailTemplate[]
+  emailAutomations    EmailAutomation[]
+  communications      Communication[]
+  assessmentQuestions AssessmentQuestion[]
+  assessmentTemplates AssessmentTemplate[]
+  assessments         Assessment[]
+  offerTemplates      OfferTemplate[]
+  offers              Offer[]
+  onboardingTasks     OnboardingTask[]
 }
 
 model Membership {
@@ -233,6 +241,11 @@ model Job {
   interviewTemplates InterviewTemplate[]
   interviews         Interview[]
 
+  assessmentQuestions AssessmentQuestion[]
+  assessmentTemplates AssessmentTemplate[]
+  assessments         Assessment[]
+  offers              Offer[]
+
   @@index([organizationId, status])
 }
 
@@ -320,6 +333,10 @@ model Candidate {
   notes          Note[]
   interviews     Interview[]
   communications Communication[]
+
+  assessments     Assessment[]
+  offers          Offer[]
+  onboardingTasks OnboardingTask[]
 
   @@index([organizationId, email])
   @@index([organizationId, phone])
@@ -417,6 +434,9 @@ model Application {
   notes          Note[]
   interviews     Interview[]
   communications Communication[]
+
+  assessments Assessment[]
+  offers      Offer[]
 
   @@unique([jobId, candidateId])
   @@index([organizationId, stageId])
@@ -894,7 +914,345 @@ model Communication {
   interview    Interview?     @relation(fields: [interviewId], references: [id], onDelete: SetNull)
   template     EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
+  assessmentId String?
+  offerId      String?
+  assessment   Assessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  offer        Offer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
   @@index([organizationId, createdAt])
   @@index([candidateId, createdAt])
   @@index([applicationId])
+}
+
+// ═══════════════════════ Phase 3: Assessments ═══════════════════════
+
+enum AssessmentQuestionType {
+  MCQ_SINGLE
+  MCQ_MULTI
+  SHORT_ANSWER
+  LONG_ANSWER
+  NUMERIC
+}
+
+enum AssessmentKind {
+  TECHNICAL
+  APTITUDE
+  LOGICAL
+  DOMAIN
+  LANGUAGE
+  MIXED
+}
+
+/// Question bank for assessments, separate from interview questions.
+model AssessmentQuestion {
+  id             String                 @id @default(cuid())
+  organizationId String
+  text           String
+  type           AssessmentQuestionType
+  kind           AssessmentKind         @default(TECHNICAL)
+  difficulty     QuestionDifficulty     @default(MEDIUM)
+  /// Choice labels for MCQ types, in display order.
+  options        String[]
+  /// Indexes into `options` for MCQ, or accepted strings/numbers for the other types.
+  correctAnswers String[]
+  /// Tolerance for NUMERIC answers (absolute).
+  tolerance      Float?
+  points         Int                    @default(1)
+  /// Shown to the candidate after submission when the organization allows it.
+  explanation    String?
+  skills         String[]
+  jobId          String?
+  source         AnalysisMethod         @default(HEURISTIC)
+  model          String?
+  promptVersion  String?
+  approved       Boolean                @default(false)
+  archivedAt     DateTime?
+  createdById    String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job?               @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  answers      AssessmentAnswer[]
+  items        AssessmentItem[]
+
+  @@index([organizationId, kind])
+  @@index([organizationId, jobId])
+}
+
+/// A reusable paper: which questions, how long, what counts as a pass.
+model AssessmentTemplate {
+  id                    String         @id @default(cuid())
+  organizationId        String
+  name                  String
+  description           String?
+  kind                  AssessmentKind @default(TECHNICAL)
+  jobId                 String?
+  durationMinutes       Int            @default(45)
+  /// Percentage of total points needed to pass. Advisory - a human decides the outcome.
+  passingPercent        Int            @default(60)
+  /// Randomise question order per candidate, to discourage answer sharing.
+  shuffleQuestions      Boolean        @default(true)
+  showResultToCandidate Boolean        @default(false)
+  isDefault             Boolean        @default(false)
+  createdById           String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job?             @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  items        AssessmentItem[]
+  assessments  Assessment[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, jobId])
+}
+
+/// One question's place on a template.
+model AssessmentItem {
+  id         String @id @default(cuid())
+  templateId String
+  questionId String
+  position   Int
+  /// Overrides the question's own points for this paper.
+  points     Int?
+
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, questionId])
+  @@index([templateId, position])
+}
+
+enum AssessmentStatus {
+  INVITED
+  IN_PROGRESS
+  SUBMITTED
+  EVALUATED
+  EXPIRED
+  CANCELLED
+}
+
+/// One candidate's sitting of one paper.
+model Assessment {
+  id                    String           @id @default(cuid())
+  organizationId        String
+  applicationId         String
+  candidateId           String
+  jobId                 String
+  templateId            String?
+  title                 String
+  kind                  AssessmentKind
+  durationMinutes       Int
+  passingPercent        Int
+  shuffleQuestions      Boolean          @default(true)
+  showResultToCandidate Boolean          @default(false)
+  status                AssessmentStatus @default(INVITED)
+  /// Hashed single-use link the candidate opens. The plain token is emailed, never stored.
+  accessTokenHash       String           @unique
+  invitedAt             DateTime         @default(now())
+  /// Link stops working after this instant.
+  expiresAt             DateTime
+  startedAt             DateTime?
+  /// Hard deadline once started: startedAt + durationMinutes.
+  dueAt                 DateTime?
+  submittedAt           DateTime?
+  /// Sum of auto-markable points earned.
+  autoScore             Int?
+  /// Points a human awarded for written answers.
+  manualScore           Int?
+  totalPoints           Int
+  /// autoScore + manualScore once evaluation is complete.
+  finalScore            Int?
+  percent               Float?
+  /// Whether the score cleared passingPercent. Advisory only.
+  passed                Boolean?
+  evaluatedById         String?
+  evaluatedAt           DateTime?
+  evaluatorNote         String?
+  createdById           String
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  application    Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidate      Candidate           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job            Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  template       AssessmentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  answers        AssessmentAnswer[]
+  communications Communication[]
+
+  @@index([organizationId, status])
+  @@index([applicationId])
+  @@index([candidateId])
+}
+
+model AssessmentAnswer {
+  id               String                 @id @default(cuid())
+  assessmentId     String
+  questionId       String?
+  /// Snapshot of the question as presented, so later bank edits don't rewrite the paper.
+  questionText     String
+  questionType     AssessmentQuestionType
+  options          String[]
+  position         Int
+  maxPoints        Int
+  /// Chosen option indexes for MCQ, or the written/numeric response.
+  response         String[]
+  /// Null for written answers until a human marks them.
+  autoCorrect      Boolean?
+  pointsAwarded    Int?
+  evaluatorComment String?
+  answeredAt       DateTime?
+
+  assessment Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question   AssessmentQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@unique([assessmentId, questionId])
+  @@index([assessmentId, position])
+}
+
+// ═══════════════════════ Phase 3: Offers & onboarding ═══════════════════════
+
+model OfferTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  /// Letter body with the same {{placeholders}} as email templates, plus offer fields.
+  body           String
+  isDefault      Boolean  @default(false)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  offers       Offer[]
+
+  @@unique([organizationId, name])
+}
+
+enum OfferStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
+}
+
+model Offer {
+  id               String      @id @default(cuid())
+  organizationId   String
+  applicationId    String
+  candidateId      String
+  jobId            String
+  templateId       String?
+  jobTitle         String
+  /// Annual or monthly as the organization uses; `salaryPeriod` says which.
+  salaryAmount     Int
+  salaryCurrency   String
+  salaryPeriod     String      @default("MONTHLY")
+  /// [{ label, value }] - allowances, bonuses, leave, equipment.
+  benefits         Json
+  startDate        DateTime
+  /// The candidate must respond by this date.
+  respondBy        DateTime
+  probationMonths  Int?
+  noticePeriodDays Int?
+  reportingTo      String?
+  workLocation     String?
+  /// Rendered letter the candidate sees. Frozen when the offer is sent.
+  letterBody       String
+  status           OfferStatus @default(DRAFT)
+  /// Hashed token for the candidate's accept/decline link.
+  accessTokenHash  String?     @unique
+  sentAt           DateTime?
+  respondedAt      DateTime?
+  declineReason    String?
+  withdrawReason   String?
+  createdById      String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  application     Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidate       Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job             Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  template        OfferTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  approvals       OfferApproval[]
+  onboardingTasks OnboardingTask[]
+  communications  Communication[]
+
+  @@index([organizationId, status])
+  @@index([applicationId])
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// One approver's decision on an offer. Every approver must approve before it can be sent.
+model OfferApproval {
+  id         String           @id @default(cuid())
+  offerId    String
+  approverId String
+  decision   ApprovalDecision @default(PENDING)
+  comment    String?
+  decidedAt  DateTime?
+  position   Int              @default(0)
+  createdAt  DateTime         @default(now())
+
+  offer    Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  approver User  @relation(fields: [approverId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, approverId])
+  @@index([approverId, decision])
+}
+
+enum OnboardingCategory {
+  DOCUMENT
+  IT_SETUP
+  HR_ADMIN
+  TRAINING
+  INTRODUCTION
+  OTHER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+model OnboardingTask {
+  id             String             @id @default(cuid())
+  organizationId String
+  offerId        String
+  candidateId    String
+  title          String
+  description    String?
+  category       OnboardingCategory @default(OTHER)
+  /// Which team member owns it. Null means unassigned.
+  assigneeId     String?
+  dueDate        DateTime?
+  status         TaskStatus         @default(TODO)
+  position       Int
+  completedAt    DateTime?
+  completedById  String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  offer        Offer        @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  candidate    Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  assignee     User?        @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([offerId, position])
+  @@index([assigneeId, status])
 }

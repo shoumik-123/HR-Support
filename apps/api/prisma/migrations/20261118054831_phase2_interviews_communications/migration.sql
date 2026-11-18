@@ -363,9 +363,3 @@ ALTER TABLE "Communication" ADD CONSTRAINT "Communication_interviewId_fkey" FORE
 
 -- AddForeignKey
 ALTER TABLE "Communication" ADD CONSTRAINT "Communication_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "EmailTemplate"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- Postgres treats NULLs as distinct in a unique index, which would allow several
--- automations for the same non-stage trigger. NULLS NOT DISTINCT enforces one per trigger.
-DROP INDEX IF EXISTS "EmailAutomation_organizationId_trigger_stageId_key";
-CREATE UNIQUE INDEX "EmailAutomation_organizationId_trigger_stageId_key"
-  ON "EmailAutomation" ("organizationId", "trigger", "stageId") NULLS NOT DISTINCT;

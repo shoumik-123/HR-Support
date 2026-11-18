@@ -20,6 +20,8 @@ export interface SendRequest {
   candidateId?: string;
   applicationId?: string;
   interviewId?: string;
+  assessmentId?: string;
+  offerId?: string;
   /** Overrides the template; used for one-off emails written in the UI. */
   subject?: string;
   body?: string;
@@ -219,6 +221,8 @@ export class CommunicationsService implements OnModuleInit {
         candidateId: req.candidateId,
         applicationId: req.applicationId,
         interviewId: req.interviewId,
+        assessmentId: req.assessmentId,
+        offerId: req.offerId,
         templateId: req.templateId,
         templateKey: req.templateKey,
         trigger: req.trigger,
@@ -244,6 +248,7 @@ export class CommunicationsService implements OnModuleInit {
     const row = await this.prisma.communication.create({
       data: {
         organizationId: req.orgId, candidateId: req.candidateId, applicationId: req.applicationId, interviewId: req.interviewId,
+        assessmentId: req.assessmentId, offerId: req.offerId,
         templateId: templateId ?? undefined, templateKey: templateKey ?? undefined, trigger: req.trigger, toEmail: to ?? "(unknown)", subject: "(not sent)", body: "",
         status: "SKIPPED", skipReason: reason, sentById: req.sentById ?? null, automated: req.automated ?? false,
       },

@@ -7,6 +7,8 @@ import { AppShell } from "@/components/app-shell";
 import { StatusChip } from "@/app/jobs/page";
 import { MatchDetail } from "@/components/match-detail";
 import { ScheduleInterviewModal } from "@/components/schedule-interview";
+import { SendAssessmentModal } from "@/components/send-assessment";
+import { CreateOfferModal } from "@/components/create-offer";
 import { Alert, EmptyState, Modal, PageHeader, ScoreBadge, Spinner, formatMoney, timeAgo } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -130,6 +132,8 @@ function PipelineBoard({ jobId }: { jobId: string }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<ApplicationCard | null>(null);
   const [scheduling, setScheduling] = useState<ApplicationCard | null>(null);
+  const [assessing, setAssessing] = useState<ApplicationCard | null>(null);
+  const [offering, setOffering] = useState<ApplicationCard | null>(null);
   const dragOver = useRef<string | null>(null);
 
   const load = useCallback(() => api<Board>(`/applications/board?jobId=${jobId}`).then(setBoard).catch((e) => setError(e.message)), [jobId]);
@@ -251,6 +255,16 @@ function PipelineBoard({ jobId }: { jobId: string }) {
                           Interview
                         </button>
                       )}
+                      {can("assessment:assign") && app.status === "ACTIVE" && (
+                        <button className="text-[11px] text-brand-600 hover:underline" onClick={() => setAssessing(app)}>
+                          Assess
+                        </button>
+                      )}
+                      {can("offer:manage") && app.status === "ACTIVE" && (
+                        <button className="text-[11px] text-brand-600 hover:underline" onClick={() => setOffering(app)}>
+                          Offer
+                        </button>
+                      )}
                       {can("pipeline:reject") && app.status === "ACTIVE" && stage.kind !== "REJECTED" && (
                         <button className="text-[11px] text-red-600 hover:underline" onClick={() => setRejecting(app)}>
                           Reject
@@ -278,6 +292,31 @@ function PipelineBoard({ jobId }: { jobId: string }) {
           void load();
         }}
       />
+
+      {assessing && (
+        <SendAssessmentModal
+          open
+          onClose={() => setAssessing(null)}
+          applicationId={assessing.id}
+          candidateName={assessing.candidate.fullName}
+          onSent={() => void load()}
+        />
+      )}
+
+      {offering && (
+        <CreateOfferModal
+          open
+          onClose={() => setOffering(null)}
+          applicationId={offering.id}
+          candidateName={offering.candidate.fullName}
+          jobTitle={board.job.title}
+          currency="BDT"
+          onCreated={() => {
+            setOffering(null);
+            router.push("/offers");
+          }}
+        />
+      )}
 
       {scheduling && (
         <ScheduleInterviewModal

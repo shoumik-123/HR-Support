@@ -3,8 +3,9 @@
 > 🇧🇩 **বাংলা ব্যবহার নির্দেশিকা:** [README.bn.md](README.bn.md) — শূন্য থেকে শুরু করার সম্পূর্ণ গাইড, লগইন তথ্যসহ।
 
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
-This repository covers **Phase 1** (core recruitment and AI screening) and **Phase 2**
-(interview and communication automation) of the product plan.
+This repository covers **Phase 1** (core recruitment and AI screening), **Phase 2**
+(interview and communication automation) and **Phase 3** (assessments, offers and
+onboarding) of the product plan.
 
 ```
 apps/api   NestJS + Prisma + PostgreSQL API, background worker, Claude integration
@@ -105,8 +106,26 @@ timezone-correct times, and calendar (.ics) invitations.
 against a real application, trigger-based automation that is off until switched on, one-off and bulk
 sending, and a full delivery log with retry.
 
-Not yet built (later phases): assessments, offers and onboarding, the public career portal, WhatsApp
-integration, and billing.
+**Assessments** (Phase 3) — a question bank (single and multiple choice, numeric, short and long
+written), reusable papers with a time limit and pass mark, per-candidate invitations on a single-use
+link needing no account, a timed sitting that autosaves and submits itself when time runs out,
+automatic marking of closed questions, and human marking of written answers.
+
+**Offers** (Phase 3) — offer letters generated from an editable template, salary and benefits,
+multi-approver sign-off where changing the terms invalidates approvals already given, a candidate
+accept/decline page on its own link, withdrawal, and automatic expiry.
+
+**Onboarding** (Phase 3) — a 14-task checklist seeded the moment a candidate accepts, grouped by
+documents, IT, HR, training and introductions, with due dates derived from the joining date,
+assignees and a progress board.
+
+Not yet built (later phases): the public career portal, semantic talent-pool search, the AI
+recruitment copilot, WhatsApp integration, and billing.
+
+**Coding assessments are deliberately not included.** The PRD requires candidate code to run in
+isolated infrastructure; running untrusted code without a sandbox would be irresponsible, so the
+assessment engine covers everything except code execution. Add it behind a container runtime
+(gVisor, Firecracker or a hosted judge) rather than in the API process.
 
 ## How AI is used
 
@@ -169,23 +188,28 @@ applications, match history and stored files.
 
 ```bash
 cd apps/api
-pnpm test                # 111 unit tests
+pnpm test                # 146 unit tests
 
 # End-to-end, against a running API with seeded demo data:
 pnpm db:seed && pnpm test:e2e          # Phase 1 — 52 checks
 pnpm db:seed && pnpm test:e2e:phase2   # Phase 2 — 86 checks
+pnpm db:seed && pnpm test:e2e:phase3   # Phase 3 — 98 checks
 ```
 
 Unit tests cover the matching algorithm and its weighting, the AI matcher's score aggregation and
 evidence filtering, redaction of protected characteristics, resume parsing and experience
 estimation, the skills taxonomy, file-type detection, the role/permission matrix including blind
 mode, scheduling arithmetic (timezone conversion across DST, overlap and conflict rules, free-slot
-search, .ics generation), scorecard weighting and panel aggregation, and email template rendering.
+search, .ics generation), scorecard weighting and panel aggregation, email template rendering, and
+assessment marking (all-or-nothing multi-select, numeric tolerance, per-candidate question shuffling,
+and withholding a result until every written answer has been marked).
 
 The end-to-end suites exercise the running API: authentication, RBAC, tenant isolation, matching and
 review, the pipeline, blind mode, uploads and validation; then templates and automation gating,
 availability and slot search, scheduling with conflict handling, question generation, scorecards and
-anti-anchoring, reschedule and cancel, and the communication log.
+anti-anchoring, reschedule and cancel, and the communication log; then the assessment question-bank
+guards, a candidate sitting taken end to end over its public link, automatic and manual marking,
+offer approval gating, the candidate's accept and decline paths, and onboarding.
 
 Run each suite against a fresh seed — the Phase 1 suite rejects an application, which leaves fewer
 active candidates than the Phase 2 suite expects.
@@ -205,7 +229,14 @@ active candidates than the Phase 2 suite expects.
   are all functions over plain data, so the awkward cases (DST, back-to-back bookings, partial
   panel availability) are covered by fast unit tests.
 - **Interview criteria are snapshotted** onto each interview when it is scheduled, so editing a
-  template later never rewrites feedback that has already been given.
+  template later never rewrites feedback that has already been given. Assessment papers work the
+  same way: question text, options and marks are copied onto the candidate's sitting, so editing the
+  bank cannot change a test already sent.
+- **Candidate-facing pages need no account.** Assessments and offers are reached through a
+  single-use link whose token is stored only as a hash. Those routes are public, rate-limited, and
+  return strictly the candidate's own material — never the answer key, never another candidate's
+  data. Withdrawing an offer or cancelling an assessment clears the hash, so the link stops working
+  at once.
 - **Prisma 7** with the `prisma-client` generator; generated code lives in `apps/api/src/generated`
   and is not committed.
 

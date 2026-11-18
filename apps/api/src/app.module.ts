@@ -7,6 +7,9 @@ import { ApplicationsController } from "./applications/applications.controller";
 import { ApplicationsService } from "./applications/applications.service";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
+import { AssessmentBankService } from "./assessments/assessment-bank.service";
+import { AssessmentBankController, AssessmentsController, PublicAssessmentController } from "./assessments/assessments.controller";
+import { AssessmentsService } from "./assessments/assessments.service";
 import { ActivityModule } from "./common/activity.service";
 import { AuthGuard } from "./common/auth.guard";
 import { AllExceptionsFilter } from "./common/http-exception.filter";
@@ -25,6 +28,8 @@ import { InterviewsService } from "./interviews/interviews.service";
 import { AvailabilityService, QuestionBankService } from "./interviews/question-bank.service";
 import { JobsService } from "./jobs/jobs.service";
 import { MailModule } from "./mail/mail.service";
+import { OffersController, OnboardingController, PublicOfferController } from "./offers/offers.controller";
+import { OffersService } from "./offers/offers.service";
 import { MatchingController } from "./matching/matching.controller";
 import { MatchingService } from "./matching/matching.service";
 import { OrgsController } from "./orgs/orgs.controller";
@@ -60,6 +65,12 @@ import { StorageModule } from "./storage/storage.service";
     InterviewsController,
     InterviewSetupController,
     CommunicationsController,
+    AssessmentsController,
+    AssessmentBankController,
+    PublicAssessmentController,
+    OffersController,
+    OnboardingController,
+    PublicOfferController,
     DashboardController,
   ],
   providers: [
@@ -76,6 +87,9 @@ import { StorageModule } from "./storage/storage.service";
     QuestionBankService,
     AvailabilityService,
     CommunicationsService,
+    AssessmentsService,
+    AssessmentBankService,
+    OffersService,
     DashboardService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

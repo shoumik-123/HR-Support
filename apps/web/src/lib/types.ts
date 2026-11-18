@@ -548,3 +548,216 @@ export interface CommunicationStats {
   automated: number;
   deliveryRate: number | null;
 }
+
+// ───────────────────────── Phase 3: Assessments ─────────────────────────
+
+export type AssessmentQuestionType = "MCQ_SINGLE" | "MCQ_MULTI" | "SHORT_ANSWER" | "LONG_ANSWER" | "NUMERIC";
+export type AssessmentKind = "TECHNICAL" | "APTITUDE" | "LOGICAL" | "DOMAIN" | "LANGUAGE" | "MIXED";
+export type AssessmentStatus = "INVITED" | "IN_PROGRESS" | "SUBMITTED" | "EVALUATED" | "EXPIRED" | "CANCELLED";
+
+export interface AssessmentBankQuestion {
+  id: string;
+  text: string;
+  type: AssessmentQuestionType;
+  kind: AssessmentKind;
+  difficulty: QuestionDifficulty;
+  options: string[];
+  correctAnswers: string[];
+  tolerance: number | null;
+  points: number;
+  explanation: string | null;
+  skills: string[];
+  jobId: string | null;
+  job?: { id: string; title: string } | null;
+  approved: boolean;
+  createdAt: string;
+  _count?: { items: number };
+}
+
+export interface AssessmentTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  kind: AssessmentKind;
+  jobId: string | null;
+  job?: { id: string; title: string } | null;
+  durationMinutes: number;
+  passingPercent: number;
+  shuffleQuestions: boolean;
+  showResultToCandidate: boolean;
+  isDefault: boolean;
+  items: { id: string; questionId: string; position: number; points: number | null; question?: { id: string; text: string; type: AssessmentQuestionType; points: number } }[];
+}
+
+export interface AssessmentAnswer {
+  id: string;
+  questionId: string;
+  questionText: string;
+  questionType: AssessmentQuestionType;
+  options: string[];
+  position: number;
+  maxPoints: number;
+  response: string[];
+  autoCorrect: boolean | null;
+  pointsAwarded: number | null;
+  evaluatorComment: string | null;
+  answeredAt: string | null;
+  question?: { correctAnswers: string[]; explanation: string | null; tolerance: number | null; skills: string[] };
+}
+
+export interface AssessmentScore {
+  autoScore: number;
+  manualScore: number;
+  totalPoints: number;
+  markedPoints: number;
+  finalScore: number;
+  percent: number | null;
+  passed: boolean | null;
+  awaitingManual: number;
+  complete: boolean;
+}
+
+export interface AssessmentListItem {
+  id: string;
+  title: string;
+  kind: AssessmentKind;
+  status: AssessmentStatus;
+  durationMinutes: number;
+  passingPercent: number;
+  totalPoints: number;
+  autoScore: number | null;
+  manualScore: number | null;
+  finalScore: number | null;
+  percent: number | null;
+  passed: boolean | null;
+  invitedAt: string;
+  expiresAt: string;
+  startedAt: string | null;
+  submittedAt: string | null;
+  evaluatedAt: string | null;
+  candidate: { id: string; fullName: string; email: string | null };
+  job: { id: string; title: string };
+  _count?: { answers: number };
+}
+
+export interface AssessmentDetail extends AssessmentListItem {
+  evaluatorNote: string | null;
+  answers: AssessmentAnswer[];
+  score: AssessmentScore;
+  template?: { id: string; name: string } | null;
+  inviteLink?: string;
+}
+
+/** What the candidate's own page receives — never the answer key. */
+export type CandidateAssessment =
+  | { state: "not_started"; title: string; organizationName: string; jobTitle: string; candidateName: string; durationMinutes: number; questionCount: number; totalPoints: number; expiresAt: string }
+  | { state: "in_progress"; title: string; organizationName: string; jobTitle: string; candidateName: string; durationMinutes: number; totalPoints: number; remainingSeconds: number; questions: { questionId: string; text: string; type: AssessmentQuestionType; options: string[]; maxPoints: number; response: string[] }[] }
+  | { state: "submitted"; title: string; organizationName: string; jobTitle: string; candidateName?: string; submittedAt: string | null; result: { percent: number; passed: boolean | null } | null }
+  | { state: "expired"; title: string; organizationName: string; jobTitle: string };
+
+// ───────────────────────── Phase 3: Offers & onboarding ─────────────────────────
+
+export type OfferStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "SENT" | "ACCEPTED" | "DECLINED" | "WITHDRAWN" | "EXPIRED";
+export type ApprovalDecision = "PENDING" | "APPROVED" | "REJECTED";
+export type OnboardingCategory = "DOCUMENT" | "IT_SETUP" | "HR_ADMIN" | "TRAINING" | "INTRODUCTION" | "OTHER";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+
+export interface Benefit {
+  label: string;
+  value: string;
+}
+
+export interface OfferApproval {
+  id: string;
+  approverId: string;
+  decision: ApprovalDecision;
+  comment: string | null;
+  decidedAt: string | null;
+  position: number;
+  approver: { id: string; name: string };
+}
+
+export interface OnboardingTask {
+  id: string;
+  title: string;
+  description: string | null;
+  category: OnboardingCategory;
+  assigneeId: string | null;
+  assignee?: { id: string; name: string } | null;
+  dueDate: string | null;
+  status: TaskStatus;
+  position: number;
+  completedAt: string | null;
+}
+
+export interface OfferListItem {
+  id: string;
+  jobTitle: string;
+  salaryAmount: number;
+  salaryCurrency: string;
+  salaryPeriod: string;
+  startDate: string;
+  respondBy: string;
+  status: OfferStatus;
+  sentAt: string | null;
+  respondedAt: string | null;
+  declineReason: string | null;
+  createdAt: string;
+  candidate: { id: string; fullName: string; email: string | null };
+  job: { id: string; title: string };
+  approvals: OfferApproval[];
+  _count?: { onboardingTasks: number };
+}
+
+export interface OfferDetail extends OfferListItem {
+  applicationId: string;
+  benefits: Benefit[];
+  probationMonths: number | null;
+  noticePeriodDays: number | null;
+  reportingTo: string | null;
+  workLocation: string | null;
+  letterBody: string;
+  withdrawReason: string | null;
+  onboardingTasks: OnboardingTask[];
+  template?: { id: string; name: string } | null;
+  canSend: boolean;
+  myApprovalPending: boolean;
+  offerLink?: string;
+}
+
+export interface OfferTemplateItem {
+  id: string;
+  name: string;
+  body: string;
+  isDefault: boolean;
+}
+
+/** What the candidate's own offer page receives. */
+export interface CandidateOffer {
+  state: "open" | "expired" | "responded";
+  organizationName: string;
+  candidateName: string;
+  jobTitle: string;
+  salary: string;
+  benefits: Benefit[];
+  startDate: string;
+  respondBy: string;
+  probationMonths: number | null;
+  noticePeriodDays: number | null;
+  reportingTo: string | null;
+  workLocation: string | null;
+  letterBody: string;
+  status: OfferStatus;
+  respondedAt: string | null;
+}
+
+export interface OnboardingBoardRow {
+  offerId: string;
+  candidate: { id: string; fullName: string; email: string | null };
+  job: { id: string; title: string };
+  jobTitle: string;
+  startDate: string;
+  daysUntilStart: number;
+  tasks: OnboardingTask[];
+  progress: { done: number; total: number; overdue: number };
+}

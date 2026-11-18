@@ -13,6 +13,7 @@ import type { Role } from "../src/generated/prisma/enums";
 import { DEFAULT_STAGES } from "../src/orgs/defaults";
 import { DEFAULT_TEMPLATES } from "../src/communications/default-templates";
 import { criteriaForKind } from "../src/interviews/scorecard-criteria";
+import { DEFAULT_OFFER_LETTER } from "../src/offers/defaults";
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 const storageDir = path.resolve(process.env.STORAGE_DIR ?? "./storage");
@@ -502,11 +503,107 @@ async function main() {
     });
   }
 
+  // ── Phase 3: assessment bank, a paper, and an offer letter template ──
+
+  await prisma.offerTemplate.create({
+    data: { organizationId: org.id, name: "Standard offer letter", body: DEFAULT_OFFER_LETTER, isDefault: true },
+  });
+
+  const assessmentSeeds = [
+    {
+      text: "Which statement best describes what a database index does?",
+      type: "MCQ_SINGLE" as const,
+      options: [
+        "Speeds up matching rows, at some cost to writes and storage",
+        "Always reduces the storage a table needs",
+        "Removes the need for a WHERE clause",
+        "Encrypts the indexed column",
+      ],
+      correctAnswers: ["0"],
+      points: 5,
+      explanation: "An index trades write throughput and disk space for faster lookups.",
+      skills: ["PostgreSQL"],
+    },
+    {
+      text: "Select every statement that is true of HTTP caching.",
+      type: "MCQ_MULTI" as const,
+      options: [
+        "A Cache-Control header can stop a response being cached",
+        "POST responses are cached by default",
+        "ETags let a client revalidate without re-downloading the body",
+        "Caching only happens in the browser",
+      ],
+      correctAnswers: ["0", "2"],
+      points: 4,
+      skills: ["REST APIs"],
+    },
+    {
+      text: "A query returns 1,200 rows in 300 milliseconds. How many rows per second is that?",
+      type: "NUMERIC" as const,
+      options: [],
+      correctAnswers: ["4000"],
+      tolerance: 50,
+      points: 3,
+      skills: [],
+    },
+    {
+      text: "An API's error rate jumps from 0.1% to 12% in ten minutes. Describe the first three things you would check, and why in that order.",
+      type: "LONG_ANSWER" as const,
+      options: [],
+      correctAnswers: [],
+      points: 10,
+      skills: ["System Design"],
+    },
+    {
+      text: "In one or two sentences, explain the difference between authentication and authorisation.",
+      type: "SHORT_ANSWER" as const,
+      options: [],
+      correctAnswers: [],
+      points: 3,
+      skills: ["Security"],
+    },
+  ];
+
+  const assessmentQuestions = await Promise.all(
+    assessmentSeeds.map((q) =>
+      prisma.assessmentQuestion.create({
+        data: {
+          ...q,
+          organizationId: org.id,
+          kind: "TECHNICAL",
+          difficulty: "MEDIUM",
+          jobId: seniorEngineer.id,
+          approved: true,
+          source: "HEURISTIC",
+          createdById: owner.id,
+        },
+      }),
+    ),
+  );
+
+  await prisma.assessmentTemplate.create({
+    data: {
+      organizationId: org.id,
+      name: "Engineering technical assessment",
+      description: "Five questions on databases, HTTP and debugging. Three mark themselves; two need a human.",
+      kind: "TECHNICAL",
+      jobId: seniorEngineer.id,
+      durationMinutes: 40,
+      passingPercent: 60,
+      shuffleQuestions: true,
+      showResultToCandidate: false,
+      isDefault: true,
+      createdById: owner.id,
+      items: { create: assessmentQuestions.map((q, position) => ({ questionId: q.id, position })) },
+    },
+  });
+
   console.log(`\nDemo organization: ${org.name}`);
   console.log("Sign in with any of these (password: " + PASSWORD + "):");
   for (const t of TEAM) console.log(`  ${t.role.padEnd(14)} ${t.email}`);
   console.log(`\n${CANDIDATES.length} candidates, 3 jobs, ${questionSeeds.length} interview questions,`);
-  console.log("2 interviews (one completed with panel feedback) and 10 email templates.");
+  console.log("2 interviews (one completed with panel feedback), 10 email templates,");
+  console.log(`${assessmentSeeds.length} assessment questions with a ready paper, and an offer letter template.`);
   console.log("Run screening from a job to generate match scores.");
 }
 

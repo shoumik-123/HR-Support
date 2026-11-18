@@ -32,6 +32,15 @@ export const Permission = {
   EmailSend: "email:send",
   EmailTemplateManage: "email:template:manage",
   AutomationManage: "automation:manage",
+  AssessmentView: "assessment:view",
+  AssessmentAssign: "assessment:assign",
+  AssessmentEvaluate: "assessment:evaluate",
+  AssessmentManage: "assessment:manage",
+  OfferView: "offer:view",
+  OfferManage: "offer:manage",
+  OfferApprove: "offer:approve",
+  OfferSend: "offer:send",
+  OnboardingManage: "onboarding:manage",
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
@@ -57,6 +66,12 @@ const recruiterSet: Permission[] = [
   Permission.InterviewConduct,
   Permission.QuestionManage,
   Permission.EmailSend,
+  Permission.AssessmentView,
+  Permission.AssessmentAssign,
+  Permission.AssessmentEvaluate,
+  Permission.AssessmentManage,
+  Permission.OfferView,
+  Permission.OfferManage,
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
@@ -70,6 +85,9 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     Permission.AuditView,
     Permission.EmailTemplateManage,
     Permission.AutomationManage,
+    Permission.OfferApprove,
+    Permission.OfferSend,
+    Permission.OnboardingManage,
   ]),
   RECRUITER: new Set(recruiterSet),
   HIRING_MANAGER: new Set([
@@ -84,6 +102,9 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     Permission.InterviewView,
     Permission.InterviewSchedule,
     Permission.InterviewConduct,
+    Permission.AssessmentView,
+    Permission.OfferView,
+    Permission.OfferApprove,
   ]),
   // Interviewers and evaluators see only what they need to run their session and
   // record feedback: no contact details, no pipeline control, no candidate-facing email.
@@ -100,8 +121,17 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     Permission.NoteWrite,
     Permission.InterviewView,
     Permission.InterviewConduct,
+    Permission.AssessmentView,
+    Permission.AssessmentEvaluate,
   ]),
-  VIEWER: new Set([Permission.JobView, Permission.CandidateView, Permission.AnalyticsView, Permission.InterviewView]),
+  VIEWER: new Set([
+    Permission.JobView,
+    Permission.CandidateView,
+    Permission.AnalyticsView,
+    Permission.InterviewView,
+    Permission.AssessmentView,
+    Permission.OfferView,
+  ]),
 };
 
 export function can(role: Role, permission: Permission): boolean {
