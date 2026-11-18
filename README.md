@@ -1,5 +1,7 @@
 # Veyra Talent
 
+> 🇧🇩 **বাংলা ব্যবহার নির্দেশিকা:** [README.bn.md](README.bn.md) — শূন্য থেকে শুরু করার সম্পূর্ণ গাইড, লগইন তথ্যসহ।
+
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
 This repository covers **Phase 1** (core recruitment and AI screening) and **Phase 2**
 (interview and communication automation) of the product plan.
