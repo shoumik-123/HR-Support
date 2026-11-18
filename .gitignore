@@ -7,3 +7,6 @@ dist
 storage
 *.log
 apps/api/src/generated
+
+# build info
+*.tsbuildinfo
