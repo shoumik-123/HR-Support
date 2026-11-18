@@ -849,3 +849,75 @@ export interface ApplicationReceipt {
   isReapplication: boolean;
   submittedAt: string;
 }
+
+// ───────────────────────── Talent-pool search ─────────────────────────
+
+export interface TalentCriteria {
+  requiredSkills: string[];
+  preferredSkills: string[];
+  excludedSkills: string[];
+  minExperienceYears: number | null;
+  maxExperienceYears: number | null;
+  locations: string[];
+  titles: string[];
+  keywords: string[];
+  education: string | null;
+  tags: string[];
+}
+
+export interface TalentQueryRead extends TalentCriteria {
+  /** Plain-language read-back of the search, so a misreading is visible at a glance. */
+  interpretation: string;
+  confidence: number;
+}
+
+export interface SearchCriterionResult {
+  criterion: "skills" | "experience" | "role" | "keywords" | "location" | "education";
+  score: number | null;
+  weight: number;
+  rationale: string;
+  evidence: string[];
+}
+
+export interface TalentHit {
+  candidate: Pick<CandidateSummary, "id" | "fullName" | "headline" | "location" | "skills" | "totalExperienceYears" | "masked"> & {
+    tags: string[];
+    updatedAt: string;
+  };
+  /** Null when the search named nothing to rank by. */
+  score: number | null;
+  breakdown: SearchCriterionResult[];
+  matchedSkills: string[];
+  missingSkills: string[];
+  reasons: string[];
+  gaps: string[];
+  confidence: number;
+  pipelines: { jobId: string; jobTitle: string; stageName: string; status: string }[];
+}
+
+export interface TalentSearchResult extends Paged<TalentHit> {
+  query: TalentQueryRead;
+  /** How the phrase was read: by a model, by the rules, or taken as given. */
+  method: "AI" | "HEURISTIC" | "MANUAL";
+  model: string | null;
+  promptVersion: string;
+  fallbackReason?: string;
+  unclear: string[];
+  blindMode: boolean;
+  poolSearched: number;
+  poolTotal: number;
+  poolTruncated: boolean;
+  excludedCount: number;
+  ranked: boolean;
+  savedSearch?: { id: string; name: string; phrase: string };
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  phrase: string;
+  criteria: TalentCriteria;
+  runCount: number;
+  lastRunAt: string | null;
+  updatedAt: string;
+}

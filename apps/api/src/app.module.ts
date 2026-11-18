@@ -44,6 +44,8 @@ import { ResumeParserService } from "./resumes/resume-parser.service";
 import { ResumesController } from "./resumes/resumes.controller";
 import { ResumesService } from "./resumes/resumes.service";
 import { StorageModule } from "./storage/storage.service";
+import { TalentController } from "./talent/talent.controller";
+import { TalentService } from "./talent/talent.service";
 
 @Module({
   imports: [
@@ -78,6 +80,7 @@ import { StorageModule } from "./storage/storage.service";
     OnboardingController,
     PublicOfferController,
     PublicCareersController,
+    TalentController,
     DashboardController,
   ],
   providers: [
@@ -98,6 +101,7 @@ import { StorageModule } from "./storage/storage.service";
     AssessmentBankService,
     OffersService,
     CareersService,
+    TalentService,
     DashboardService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },

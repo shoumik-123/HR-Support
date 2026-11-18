@@ -5,7 +5,8 @@
 AI-powered, multi-tenant applicant tracking and talent acquisition platform.
 This repository covers **Phase 1** (core recruitment and AI screening), **Phase 2**
 (interview and communication automation), **Phase 3** (assessments, offers and
-onboarding) and **Phase 4** (the public careers portal) of the product plan.
+onboarding), **Phase 4** (the public careers portal) and **Phase 5** (talent-pool search)
+of the product plan.
 
 ```
 apps/api   NestJS + Prisma + PostgreSQL API, background worker, Claude integration
@@ -133,8 +134,24 @@ a hidden vacancy exists. An application lands in the Applied stage with source `
 the resume is parsed in the background like any other, and the candidate is emailed a receipt and
 shown a reference. The whole page can be switched off in Settings.
 
-Not yet built (later phases): semantic talent-pool search, the AI recruitment copilot, WhatsApp
-integration, and billing.
+**Talent-pool search** (Phase 5) — one search box that takes a sentence: "3+ years React
+developer in Dhaka, preferably Node.js, no WordPress". The phrase is turned into criteria —
+required and preferred skills, an experience range, a role, a location, a qualification, terms
+to look for, skills that rule someone out — and the criteria are shown back in plain language
+for the recruiter to correct before trusting the list. Reading the phrase is the only place a
+model is used, and it is shown the recruiter's own words and nothing else: no candidate, no
+resume, no profile ever reaches it. Ranking is fixed arithmetic over the criteria (skills 40,
+experience 20, role 15, terms 10, location 10, education 5, with the weight of anything the
+search did not ask about shared out among the rest), so the same criteria always produce the
+same order, and every candidate carries the reasons they are in the list, the gaps, the resume
+line that evidences each skill, and which pipelines they are already in. Someone a little short
+of the asked experience appears lower down rather than disappearing; a figure the parser could
+not read scores 40 with the reason stated, never 0. A search can be saved under a name, with the
+criteria it was approved with, and re-run later — saved searches are private to their author. In
+blind mode the resume is redacted before it is searched at all, so a name cannot be typed in to
+see which masked card comes back.
+
+Not yet built (later phases): the AI recruitment copilot, WhatsApp integration, and billing.
 
 **Coding assessments are deliberately not included.** The PRD requires candidate code to run in
 isolated infrastructure; running untrusted code without a sandbox would be irresponsible, so the
@@ -209,13 +226,14 @@ applications, match history and stored files.
 
 ```bash
 cd apps/api
-pnpm test                # 190 unit tests
+pnpm test                # 224 unit tests
 
 # End-to-end, against a running API with seeded demo data:
 pnpm db:seed && pnpm test:e2e          # Phase 1 — 52 checks
 pnpm db:seed && pnpm test:e2e:phase2   # Phase 2 — 86 checks
 pnpm db:seed && pnpm test:e2e:phase3   # Phase 3 — 98 checks
 pnpm db:seed && pnpm test:e2e:phase4   # Phase 4 — 51 checks
+pnpm db:seed && pnpm test:e2e:phase5   # Phase 5 — 59 checks
 ```
 
 Unit tests cover the matching algorithm and its weighting, the AI matcher's score aggregation and
@@ -226,7 +244,11 @@ search, .ics generation), scorecard weighting and panel aggregation, email templ
 assessment marking (all-or-nothing multi-select, numeric tolerance, per-candidate question shuffling,
 and withholding a result until every written answer has been marked), and what the careers portal is
 allowed to show (which jobs are listable, salary visibility, the listing teaser, and the absence of
-hiring data from every public shape).
+hiring data from every public shape), and how a talent-pool search phrase is read (requirements
+against bonuses against exclusions, experience floors and ranges including Bengali numerals, filler
+words that must not become search terms) together with the ranking arithmetic (weight
+redistribution, evidence quoting, protected lines never becoming evidence, and no criterion scoring
+zero merely because the data is missing).
 
 The end-to-end suites exercise the running API: authentication, RBAC, tenant isolation, matching and
 review, the pipeline, blind mode, uploads and validation; then templates and automation gating,
@@ -237,7 +259,11 @@ offer approval gating, the candidate's accept and decline paths, and onboarding;
 careers portal — browsing and filtering with no token, drafts and confidential and expired jobs
 staying invisible, salary visibility, every apply-form rejection, a complete application arriving in
 the recruiter's pipeline with its receipt and acknowledgement, re-applying, switching the portal off,
-and the fact that an `X-Org-Id` header on a public route changes nothing.
+and the fact that an `X-Org-Id` header on a public route changes nothing; then talent-pool search —
+a phrase read into criteria, hand-corrected criteria searched as given, the same criteria producing
+the same order twice, exclusions removing people rather than demoting them, an empty search carrying
+no scores at all, saved searches staying private to their author, and a name finding nobody once
+blind mode is on.
 
 Run each suite against a fresh seed — the Phase 1 suite rejects an application, which leaves fewer
 active candidates than the Phase 2 suite expects.

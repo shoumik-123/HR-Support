@@ -54,6 +54,7 @@ model User {
   availability    InterviewerAvailability[]
   offerApprovals  OfferApproval[]
   onboardingTasks OnboardingTask[]
+  savedSearches   SavedSearch[]
 }
 
 model Organization {
@@ -104,6 +105,7 @@ model Organization {
   offerTemplates      OfferTemplate[]
   offers              Offer[]
   onboardingTasks     OnboardingTask[]
+  savedSearches       SavedSearch[]
 }
 
 model Membership {
@@ -1262,4 +1264,31 @@ model OnboardingTask {
   @@index([organizationId, status])
   @@index([offerId, position])
   @@index([assigneeId, status])
+}
+
+// ───────────────────────── Talent-pool search ─────────────────────────
+
+/// A search a recruiter wants to run again. Private to its author: a saved search is a
+/// working note about an open role, not a shared artefact, and sharing one would quietly
+/// hand its author's wording to the whole organization.
+model SavedSearch {
+  id             String    @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  /// The phrase as typed, so it can be re-read if the parser improves.
+  phrase         String
+  /// The criteria the phrase was understood as, stored so a re-run searches for the same
+  /// thing the recruiter saw and approved - not whatever the parser decides next month.
+  criteria       Json
+  runCount       Int       @default(0)
+  lastRunAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, createdById, name])
+  @@index([organizationId, createdById, updatedAt])
 }

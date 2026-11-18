@@ -32,7 +32,7 @@ apps/api/                NestJS 11 — সব বিজনেস লজিক �
   src/generated/prisma   Prisma client (generated, কমিট করা হয় না)
   src/common/            guard, permission, activity log, crypto, validation
   src/<module>/          ফিচার মডিউল (নিচে তালিকা)
-  test/                  node:test, ১৪৬টা ইউনিট টেস্ট
+  test/                  node:test, ২২৪টা ইউনিট টেস্ট
 apps/web/src/app/        Next.js App Router — এক ফোল্ডার = এক রুট
 scripts/dev-db.mjs       লোকাল Postgres
 ```
@@ -80,6 +80,7 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
 | `offers` | offer letter, approval chain, onboarding | `offers.service.ts` |
 | `communications` | email template, automation | `template-render.ts` |
 | `careers` | পাবলিক job board ও apply (auth ছাড়া) | `public-view.ts` |
+| `talent` | প্রার্থী-ভাণ্ডারে ভাষাভিত্তিক সার্চ, জমানো সার্চ | `talent-query.ts` |
 | `queue` | Postgres-ভিত্তিক job queue | `queue.service.ts` |
 | `ai` | Claude API wrapper | `ai.service.ts` |
 | `dashboard` | সংখ্যা, funnel | `dashboard.service.ts` |
@@ -94,6 +95,10 @@ permission তালিকা + ৮টা role-এর ম্যাপ। `role =
 - [assessments/scoring.ts](apps/api/src/assessments/scoring.ts) — মার্কিং নিয়ম
 - [careers/public-view.ts](apps/api/src/careers/public-view.ts) — পাবলিক পেজে কোন চাকরি দেখানো যাবে আর
   প্রতিটা response-এ কোন কোন ফিল্ড যাবে; hiring ডেটা এখানেই ছেঁকে বাদ পড়ে
+- [talent/talent-query.ts](apps/api/src/talent/talent-query.ts) — রিক্রুটারের বাক্য → মাপকাঠি; clause ধরে
+  ধরে required / preferred / excluded আলাদা হয়, API key না থাকলে এটাই একমাত্র পার্সার
+- [talent/talent-scoring.ts](apps/api/src/talent/talent-scoring.ts) — সার্চের র‍্যাঙ্কিং; ওজন নির্দিষ্ট,
+  অনুপস্থিত মাপকাঠির ওজন পুনর্বণ্টিত, প্রতিটা দাবির সাথে CV-র লাইন
 
 ---
 
@@ -192,10 +197,12 @@ const canSeeOthers = !owesFeedback;
 ## ১০. টেস্ট
 
 ```bash
-cd apps/api && pnpm test        # ১৪৬ ইউনিট টেস্ট, কোনো সার্ভার লাগে না
+cd apps/api && pnpm test        # ২২৪ ইউনিট টেস্ট, কোনো সার্ভার লাগে না
 pnpm test:e2e                   # Phase 1 — ৫২ HTTP চেক
 pnpm test:e2e:phase2            # ৮৬
 pnpm test:e2e:phase3            # ৯৮
+pnpm test:e2e:phase4            # ৫১
+pnpm test:e2e:phase5            # ৫৯
 ```
 
 e2e-র জন্য তিনটা সার্ভার চালু থাকতে হবে। প্রতিটা suite শুরুতেই নিজের আগের ডেটা পরিষ্কার করে,

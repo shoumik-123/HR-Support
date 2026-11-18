@@ -10,6 +10,7 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: "▦", permission: "analytics:view" },
   { href: "/jobs", label: "Jobs", icon: "▤", permission: "job:view" },
   { href: "/candidates", label: "Candidates", icon: "◍", permission: "candidate:view" },
+  { href: "/talent-search", label: "Smart search", icon: "✦", permission: "candidate:view" },
   { href: "/interviews", label: "Interviews", icon: "◷", permission: "interview:view" },
   { href: "/assessments", label: "Assessments", icon: "✎", permission: "assessment:view" },
   { href: "/offers", label: "Offers", icon: "◎", permission: "offer:view" },
